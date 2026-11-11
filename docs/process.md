@@ -4,15 +4,15 @@ How this project goes from idea to a game the team plays, and how each step is d
 
 ## Phases
 
-| #   | Phase                                 | Exit condition                                                         | Status                                    |
-| --- | ------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------- |
-| 1   | Agree on boundaries                   | A short brief with constraints and non-goals                           | Done: [brief](brief.md)                   |
-| 2   | Choose and test the core loop         | The team understands the rules and wants to play again                 | Rules v0 written; paper playtest pending  |
-| 3   | Resolve the architecture questions    | An architecture sketch and explicit session rules                      | Proposed: [architecture](architecture.md) |
-| 4   | Deployed multiplayer walking skeleton | Teammates join one room from their own devices and see one action sync | Next                                      |
-| 5   | First playable slice                  | A full game with no developer repairing it                             |                                           |
-| 6   | Team playtests drive development      | Correctness, clarity and fun problems found in play get fixed          |                                           |
-| 7   | Harden and polish                     | Someone can run a session without the implementers supervising         |                                           |
+| #   | Phase                                 | Exit condition                                                         | Status                                                     |
+| --- | ------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 1   | Agree on boundaries                   | A short brief with constraints and non-goals                           | Done: [brief](brief.md)                                    |
+| 2   | Choose and test the core loop         | The team understands the rules and wants to play again                 | Rules v0 written; paper playtest pending                   |
+| 3   | Resolve the architecture questions    | An architecture sketch and explicit session rules                      | Done: [architecture](architecture.md), approved 2026-11-11 |
+| 4   | Deployed multiplayer walking skeleton | Teammates join one room from their own devices and see one action sync | Next                                                       |
+| 5   | First playable slice                  | A full game with no developer repairing it                             |                                                            |
+| 6   | Team playtests drive development      | Correctness, clarity and fun problems found in play get fixed          |                                                            |
+| 7   | Harden and polish                     | Someone can run a session without the implementers supervising         |                                                            |
 
 ## Slices
 

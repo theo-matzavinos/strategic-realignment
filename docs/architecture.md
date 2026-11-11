@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** proposed. The RPC surface and data shapes below need approval before implementation starts; the walking skeleton (slice 2) is their first consumer.
+**Status:** approved on 2026-11-11. The routes, RPC surface, rules engine signatures, `PlayerView` shape and hidden-information mapping below are agreed; a material change to any of them needs approval again. The walking skeleton (slice 2) is their first consumer.
 
 ## Principles
 
