@@ -1,10 +1,20 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Button } from '#ui/button';
-import { minPlayers, maxPlayers } from '../../../game/game';
+import { minPlayers } from '../../../game/game';
 import type { PlayerView } from '../../../game/view';
 import { JoinRoomForm } from '../../+lobby/join-room-form';
-import { cardNames, demandNames, roleNames } from './display-names';
+import { AuditVote } from './audit-vote';
+import { BoardPanel } from './board-panel';
+import { DemandPanel } from './demand-panel';
+import { roleNames } from './display-names';
+import { HandPanel } from './hand-panel';
+import { panel } from './panel';
+import { PlayersPanel } from './players-panel';
+import { ResultPanel } from './result-panel';
+import { RetroPanel } from './retro-panel';
+import { RevealPanel } from './reveal-panel';
+import { RoomRequest } from './room-request';
 import { injectRoute } from './route.generated';
 import { injectRpc } from './rpc.generated';
 
@@ -16,9 +26,21 @@ const phaseNames: Record<PlayerView['phase'], string> = {
 };
 
 @Component({
-  imports: [Button, JoinRoomForm, RouterLink],
+  imports: [
+    AuditVote,
+    BoardPanel,
+    Button,
+    DemandPanel,
+    HandPanel,
+    JoinRoomForm,
+    PlayersPanel,
+    ResultPanel,
+    RetroPanel,
+    RevealPanel,
+    RouterLink,
+  ],
   template: `
-    <main class="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
+    <main class="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10 wrap-anywhere">
       <header class="flex flex-wrap items-end justify-between gap-4">
         <div class="flex flex-col">
           <p class="text-label text-muted-foreground">Room code</p>
@@ -46,6 +68,16 @@ const phaseNames: Record<PlayerView['phase'], string> = {
         @if (room.phase !== 'lobby') {
           <p class="text-title">Sprint {{ room.sprint }} · {{ phaseNames[room.phase] }}</p>
 
+          @if (room.phase === 'ended') {
+            <app-result-panel [room]="room" />
+            @if (room.vote !== null) {
+              <div [class]="panel">
+                <p class="text-muted-foreground">The game ended on this audit: Morale reached 0.</p>
+                <app-audit-vote [room]="room" />
+              </div>
+            }
+          }
+
           <div class="grid gap-4 sm:grid-cols-2">
             <section aria-labelledby="role-heading" [class]="panel">
               <h2 id="role-heading" class="text-label text-muted-foreground">Your role</h2>
@@ -54,83 +86,26 @@ const phaseNames: Record<PlayerView['phase'], string> = {
               }
             </section>
 
-            <section aria-labelledby="demand-heading" [class]="panel">
-              <h2 id="demand-heading" class="text-label text-muted-foreground">
-                This sprint's demand
-              </h2>
-              @if (room.demand; as demand) {
-                <p class="text-headline">{{ demandNames[demand] }}</p>
-              }
-            </section>
+            <app-demand-panel [room]="room" />
           </div>
 
-          <section aria-labelledby="hand-heading" [class]="panel">
-            <h2 id="hand-heading" class="text-title">Your hand</h2>
-            <ul class="flex flex-wrap gap-2">
-              @for (card of room.me.hand; track $index) {
-                <li class="rounded-control border border-border bg-muted px-3 py-2">
-                  {{ cardNames[card] }}
-                </li>
-              }
-            </ul>
-          </section>
+          <app-board-panel [board]="room.board" />
 
-          <section aria-labelledby="board-heading" [class]="panel">
-            <h2 id="board-heading" class="text-title">Board</h2>
-            <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div>
-                <dt class="text-label text-muted-foreground">Progress</dt>
-                <dd class="text-headline">{{ room.board.progress }} / {{ room.board.target }}</dd>
-              </div>
-              <div>
-                <dt class="text-label text-muted-foreground">Morale</dt>
-                <dd class="text-headline">{{ room.board.morale }}</dd>
-              </div>
-              <div>
-                <dt class="text-label text-muted-foreground">Debt</dt>
-                <dd class="text-headline">{{ room.board.debt }}</dd>
-              </div>
-              <div>
-                <dt class="text-label text-muted-foreground">Audits left</dt>
-                <dd class="text-headline">{{ room.board.auditsLeft }}</dd>
-              </div>
-            </dl>
-          </section>
+          @if (room.phase === 'contribute') {
+            <app-hand-panel [room]="room" />
+          }
+          @if (room.lastReveal !== null) {
+            <app-reveal-panel [room]="room" />
+          }
+          @if (room.phase === 'retro') {
+            <app-retro-panel [room]="room" />
+          }
+          @if (room.phase !== 'contribute') {
+            <app-hand-panel [room]="room" />
+          }
         }
 
-        <section aria-labelledby="players-heading" [class]="panel">
-          <div class="flex items-baseline justify-between">
-            <h2 id="players-heading" class="text-title">Players</h2>
-            @if (room.phase === 'lobby') {
-              <span class="text-label text-muted-foreground">
-                {{ room.players.length }}/{{ maxPlayers }}
-              </span>
-            }
-          </div>
-          <ul class="flex flex-col divide-y divide-border">
-            @for (player of room.players; track player.playerId) {
-              <li class="flex flex-wrap items-baseline gap-x-2 py-2">
-                <span class="font-semibold">{{ player.name }}</span>
-                @if (player.isHost) {
-                  <span class="text-label text-muted-foreground"> (host)</span>
-                }
-                @if (player.playerId === room.me.playerId) {
-                  <span class="text-label text-success"> (you)</span>
-                }
-                @if (room.phase !== 'lobby') {
-                  <span class="ms-auto text-label text-muted-foreground">
-                    {{ player.handSize }} cards · Contributed:
-                    @if (player.hasContributed) {
-                      yes
-                    } @else {
-                      no
-                    }
-                  </span>
-                }
-              </li>
-            }
-          </ul>
-        </section>
+        <app-players-panel [room]="room" />
 
         @if (room.phase === 'lobby') {
           @if (isHost(room)) {
@@ -139,9 +114,9 @@ const phaseNames: Record<PlayerView['phase'], string> = {
                 foldButton
                 variant="primary"
                 size="lg"
-                [disabled]="starting() || room.players.length < minPlayers"
+                [disabled]="start.pending() || room.players.length < minPlayers"
                 focusableWhenDisabled
-                (click)="start()"
+                (click)="startGame()"
               >
                 Start the game
               </button>
@@ -150,7 +125,7 @@ const phaseNames: Record<PlayerView['phase'], string> = {
                   The game needs at least {{ minPlayers }} players. Share the code above.
                 </p>
               }
-              @if (startError(); as message) {
+              @if (start.error(); as message) {
                 <p role="alert" class="text-destructive-text">{{ message }}</p>
               }
             </div>
@@ -168,14 +143,10 @@ export default class RoomPage {
   readonly #route = injectRoute();
   readonly #rpc = injectRpc();
 
-  protected readonly panel =
-    'flex flex-col gap-3 rounded-surface border border-border bg-surface p-5';
+  protected readonly panel = panel;
   protected readonly phaseNames = phaseNames;
   protected readonly roleNames = roleNames;
-  protected readonly cardNames = cardNames;
-  protected readonly demandNames = demandNames;
   protected readonly minPlayers = minPlayers;
-  protected readonly maxPlayers = maxPlayers;
 
   protected readonly code = computed(() => this.#route.params().code.toUpperCase());
   protected readonly view = this.#rpc.room.view.connect({
@@ -213,8 +184,7 @@ export default class RoomPage {
     }
   });
 
-  protected readonly starting = signal(false);
-  protected readonly startError = signal<string | null>(null);
+  protected readonly start = new RoomRequest(this.view.value);
 
   protected isHost(room: PlayerView): boolean {
     for (const player of room.players) {
@@ -226,25 +196,13 @@ export default class RoomPage {
     return false;
   }
 
-  protected async start(): Promise<void> {
-    if (this.starting()) {
+  protected startGame(): void {
+    const room = this.view.value();
+    if (room === null || room.players.length < minPlayers) {
       return;
     }
 
-    this.starting.set(true);
-    this.startError.set(null);
-
-    try {
-      await this.#rpc.room.startGame({ code: this.code() });
-    } catch (error) {
-      if (this.#rpc.room.startGame.isError(error)) {
-        this.startError.set(error.message);
-      } else {
-        this.startError.set("Couldn't reach the server. Try again.");
-      }
-    } finally {
-      this.starting.set(false);
-    }
+    void this.start.send(() => this.#rpc.room.startGame({ code: this.code() }));
   }
 
   #failedWith(code: 'FORBIDDEN' | 'INVALID_INPUT'): boolean {

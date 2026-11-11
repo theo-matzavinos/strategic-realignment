@@ -192,3 +192,18 @@ The source is public. Team game sessions run on a private deployment, to be chos
 - **Draw at the start of the next sprint,** so hands hold 2 cards during the retro. At v0 numbers the deck never runs out, so the reshuffle rule is covered by a unit test on a constructed game only.
 
 **Why:** each follows the paper rules as closely as the browser allows, and none needs a new view field.
+
+## D17. An accepted action returns the room's version
+
+**2026-11-11**
+
+**Context:** after a player acts, the mutation's response and the view stream's next snapshot travel separately. Other players' snapshots can arrive first, and a nomination can undo a ready mark before the response lands. A control that re-enabled on whatever snapshot came next could be used again on a view that didn't yet show its action, and one that waited for its action's visible effect could wait forever.
+
+**Options:**
+
+- **Each accepted action returns `{ version }`.** The control waits until its view reaches that version.
+- **Mutations return nothing, and the page infers the outcome from view fields.** It needs per-control state and guesses which snapshot follows the action.
+
+**Chosen:** return `{ version }`, the room's version right after the action ([architecture](architecture.md#how-a-change-reaches-players)). If the response is lost, the control is usable again at once with "Couldn't reach the server. Try again."; a retry is checked against the current game, so if the action had in fact gone through and still stands, it gets its declared refusal, such as "You've already voted." A Ready that a nomination has since cleared can be marked again, as it should.
+
+**Why:** the version is already in every view, so it leaks nothing, and it is the only causal link between a response and a snapshot. Reopening the stream after a lost response was tried and dropped: Launch 0.0.6's `reconnect()` does nothing while a stream is open, so it needed undocumented Launch behavior, for a rare network failure that a declared refusal already covers.

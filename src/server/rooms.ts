@@ -1,3 +1,4 @@
+import type { Action } from '../game/action';
 import { applyAction, type ActionErrorCode } from '../game/apply-action';
 import { addPlayer, createGame, maxPlayers, type Game, type PlayerId } from '../game/game';
 import type { Room } from '../game/room';
@@ -87,9 +88,16 @@ export class ServerRoom implements Room {
     return null;
   }
 
-  /** Starts the game for `playerId` through the rules, or says why the rules refused. */
-  startGame(playerId: PlayerId): ActionErrorCode<'startGame'> | null {
-    const result = applyAction(this.#game, playerId, { type: 'startGame' });
+  /**
+   * Applies one of `playerId`'s actions through the rules: stores the next game, moves `version` on
+   * by one, wakes the streams and returns the new version, so the caller can tell when a view
+   * shows it. A refused action changes nothing and returns why.
+   */
+  act<Validated extends Action>(
+    playerId: PlayerId,
+    action: Validated,
+  ): ActionErrorCode<Validated['type']> | { version: number } {
+    const result = applyAction(this.#game, playerId, action);
     if ('code' in result) {
       return result.code;
     }
@@ -97,7 +105,7 @@ export class ServerRoom implements Room {
     this.#game = result;
     this.#changed();
 
-    return null;
+    return { version: this.#version };
   }
 
   /**

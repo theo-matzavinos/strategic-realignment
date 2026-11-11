@@ -1,75 +1,16 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { newPlayerContext } from './access';
+import {
+  fillWhenReady,
+  players,
+  publicPlayerKeys,
+  readViewSnapshot,
+  stringsIn,
+  viewKeys,
+} from './room-page';
 
 const names = ['Ana', 'Ben', 'Chloe', 'Dimitri', 'Eleni'];
 
-function players(page: Page) {
-  return page.getByRole('region', { name: 'Players' }).getByRole('listitem');
-}
-
-/**
- * Reads the first snapshot of this browser's own room.view stream, as the server sends it, so the
- * test sees the whole payload and not only what the page renders.
- */
-async function readViewSnapshot(page: Page, code: string): Promise<Record<string, unknown>> {
-  return page.evaluate(async (roomCode) => {
-    const response = await fetch('/_rpc/room/view', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-      body: JSON.stringify({ input: { code: roomCode } }),
-    });
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    try {
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) {
-          throw new Error(`The stream ended before a snapshot: ${buffer}`);
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const match = /event: value\r?\ndata: (.*)\r?\n\r?\n/.exec(buffer);
-        if (match) {
-          return JSON.parse(match[1]);
-        }
-      }
-    } finally {
-      await reader.cancel();
-    }
-  }, code);
-}
-
-/** Every string anywhere in a JSON value. */
-function stringsIn(value: unknown): string[] {
-  if (typeof value === 'string') {
-    return [value];
-  }
-  if (Array.isArray(value)) {
-    return value.flatMap(stringsIn);
-  }
-  if (value !== null && typeof value === 'object') {
-    return Object.values(value).flatMap(stringsIn);
-  }
-  return [];
-}
-
-const viewKeys = [
-  'board',
-  'code',
-  'demand',
-  'lastReveal',
-  'me',
-  'pastDemands',
-  'phase',
-  'players',
-  'result',
-  'retroReady',
-  'sprint',
-  'version',
-  'vote',
-];
-const publicPlayerKeys = ['handSize', 'hasContributed', 'isAudited', 'isHost', 'name', 'playerId'];
 const secretValues = [
   'plant',
   'delivery',
@@ -80,18 +21,6 @@ const secretValues = [
   'status',
   'workshop',
 ];
-
-/** Waits for the browser app, since the lobby's buttons stay disabled until it runs. */
-async function fillWhenReady(page: Page, region: string, fields: Record<string, string>) {
-  const form = page.getByRole('region', { name: region });
-  await expect(form.getByRole('button')).toBeEnabled();
-
-  for (const [label, value] of Object.entries(fields)) {
-    await form.getByLabel(label, { exact: true }).fill(value);
-  }
-
-  return form;
-}
 
 test('five isolated players create, join and start a game, each seeing only their own role and hand', async ({
   browser,
@@ -187,9 +116,10 @@ test('five isolated players create, join and start a game, each seeing only thei
         plants++;
       }
 
-      await expect(
-        page.getByRole('region', { name: 'Your hand' }).getByRole('listitem'),
-      ).toHaveCount(3);
+      // In Contribute, the hand is where you choose your card.
+      await expect(page.getByRole('region', { name: 'Your hand' }).getByRole('radio')).toHaveCount(
+        3,
+      );
       await expect(page.getByRole('region', { name: "This sprint's demand" })).not.toBeEmpty();
       await expect(players(page)).toHaveCount(5);
       for (const player of await players(page).all()) {

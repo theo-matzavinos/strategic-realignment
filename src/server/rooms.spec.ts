@@ -1,3 +1,4 @@
+import { cardTypes, type CardType } from '../game/cards';
 import { viewFor } from '../game/view';
 import { Rooms, type ServerRoom } from './rooms';
 
@@ -11,6 +12,24 @@ function roomWith(playerCount: number): ServerRoom {
 
 function hostOf(room: ServerRoom): string {
   return room.players[0].playerId;
+}
+
+const start = { type: 'startGame' } as const;
+
+function startedRoom(playerCount: number): ServerRoom {
+  const room = roomWith(playerCount);
+  // Version 1 at creation, then one per join.
+  expect(room.act(hostOf(room), start)).toEqual({ version: playerCount + 1 });
+  return room;
+}
+
+/** A card type the player doesn't hold. Hands hold 3 cards of 6 types, so there always is one. */
+function cardNotIn(hand: CardType[]): CardType {
+  const missing = cardTypes.find((card) => !hand.includes(card));
+  if (missing === undefined) {
+    throw new Error('The hand holds every card type');
+  }
+  return missing;
 }
 
 describe('Rooms.create', () => {
@@ -58,7 +77,7 @@ describe('ServerRoom.join', () => {
     expect(room.version).toBe(5);
     expect(room.players).toHaveLength(5);
 
-    expect(room.startGame(hostOf(room))).toBeNull();
+    expect(room.act(hostOf(room), start)).toEqual({ version: 6 });
     expect(room.join('s2', 'Player 2')).toBeNull();
     expect(room.seats.get('s2')).toBe(seat);
   });
@@ -81,18 +100,18 @@ describe('ServerRoom.join', () => {
 
   it('refuses a new player once the game has started', () => {
     const room = roomWith(5);
-    room.startGame(hostOf(room));
+    room.act(hostOf(room), start);
 
     expect(room.join('s6', 'Player 6')).toBe('GAME_STARTED');
     expect(room.players).toHaveLength(5);
   });
 });
 
-describe('ServerRoom.startGame', () => {
+describe('ServerRoom.act: startGame', () => {
   it('refuses a player who is not the host', () => {
     const room = roomWith(5);
 
-    expect(room.startGame(room.players[1].playerId)).toBe('NOT_HOST');
+    expect(room.act(room.players[1].playerId, start)).toBe('NOT_HOST');
     expect(room.game.phase).toBe('lobby');
     expect(room.version).toBe(5);
   });
@@ -100,15 +119,15 @@ describe('ServerRoom.startGame', () => {
   it('refuses fewer than 5 players', () => {
     const room = roomWith(4);
 
-    expect(room.startGame(hostOf(room))).toBe('NOT_ENOUGH_PLAYERS');
+    expect(room.act(hostOf(room), start)).toBe('NOT_ENOUGH_PLAYERS');
   });
 
   it("starts the game once, and every player's view shows only their own hand", () => {
     const room = roomWith(5);
 
-    expect(room.startGame(hostOf(room))).toBeNull();
+    expect(room.act(hostOf(room), start)).toEqual({ version: 6 });
     expect(room.version).toBe(6);
-    expect(room.startGame(hostOf(room))).toBe('WRONG_PHASE');
+    expect(room.act(hostOf(room), start)).toBe('WRONG_PHASE');
 
     for (const player of room.players) {
       const view = viewFor(room, player.playerId);
@@ -116,6 +135,88 @@ describe('ServerRoom.startGame', () => {
       expect(view.me.hand).toHaveLength(3);
       expect(view.players.map((seat) => seat.handSize)).toEqual([3, 3, 3, 3, 3]);
     }
+  });
+});
+
+describe('ServerRoom.act: the rest of the game', () => {
+  it('stores an accepted contribution, moves the version on by one and returns it', () => {
+    const room = startedRoom(5);
+    const player = room.players[1].playerId;
+    const [card] = viewFor(room, player).me.hand;
+
+    expect(room.act(player, { type: 'contribute', card })).toEqual({ version: 7 });
+
+    expect(room.version).toBe(7);
+    const view = viewFor(room, player);
+    expect(view.me.contribution).toBe(card);
+    expect(view.me.hand).toHaveLength(2);
+  });
+
+  it('refuses a second contribution and a card not in hand, changing nothing', () => {
+    const room = startedRoom(5);
+    const [first, second] = room.players;
+    const firstHand = viewFor(room, first.playerId).me.hand;
+    room.act(first.playerId, { type: 'contribute', card: firstHand[0] });
+    const game = room.game;
+    const version = room.version;
+
+    expect(room.act(first.playerId, { type: 'contribute', card: firstHand[1] })).toBe(
+      'ALREADY_CONTRIBUTED',
+    );
+    const secondHand = viewFor(room, second.playerId).me.hand;
+    expect(room.act(second.playerId, { type: 'contribute', card: cardNotIn(secondHand) })).toBe(
+      'CARD_NOT_IN_HAND',
+    );
+
+    expect(room.game).toBe(game);
+    expect(room.version).toBe(version);
+  });
+
+  it('plays a sprint, a retro vote and ready marks through the same path', () => {
+    const room = startedRoom(5);
+    const ids = room.players.map((player) => player.playerId);
+    for (const id of ids) {
+      const [card] = viewFor(room, id).me.hand;
+      const version = room.version;
+      expect(room.act(id, { type: 'contribute', card })).toEqual({ version: version + 1 });
+    }
+    expect(room.game.phase).toBe('retro');
+
+    expect(room.act(ids[0], { type: 'nominate', nominee: ids[0] })).toBe('SELF_NOMINATION');
+    expect(room.act(ids[0], { type: 'finishRetro' })).toEqual({ version: 12 });
+    expect(room.act(ids[0], { type: 'nominate', nominee: ids[1] })).toEqual({ version: 13 });
+    expect(room.act(ids[2], { type: 'finishRetro' })).toBe('VOTE_OPEN');
+    for (const id of ids) {
+      const version = room.version;
+      expect(room.act(id, { type: 'vote', yes: false })).toEqual({ version: version + 1 });
+    }
+    const beforeReady = room.version;
+    for (const id of ids) {
+      const version = room.version;
+      expect(room.act(id, { type: 'finishRetro' })).toEqual({ version: version + 1 });
+    }
+
+    expect(room.version).toBe(beforeReady + 5);
+    expect(room.game.phase).toBe('contribute');
+    expect(viewFor(room, ids[0]).sprint).toBe(2);
+  });
+
+  it('wakes a waiting stream on an accepted action, and not on a refused one', async () => {
+    const room = startedRoom(5);
+    const player = room.players[0].playerId;
+    let woken = false;
+    const waiting = room.changedSince(room.version, new AbortController().signal).then(() => {
+      woken = true;
+    });
+
+    room.act(player, { type: 'finishRetro' });
+    await Promise.resolve();
+    expect(woken).toBe(false);
+
+    const [card] = viewFor(room, player).me.hand;
+    room.act(player, { type: 'contribute', card });
+    await waiting;
+    expect(woken).toBe(true);
   });
 });
 

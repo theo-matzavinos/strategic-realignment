@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** approved on 2026-11-11. The routes, RPC surface, rules engine signatures, `PlayerView` shape and hidden-information mapping below are agreed; a material change to any of them needs approval again. The same day the server runtime changed from an Express process to one Durable Object on Cloudflare ([D9](decisions.md#d9-hosting-the-whole-app-in-one-durable-object-on-cloudflare)). The walking skeleton (slice 2) is their first consumer. Later the same day `lastReveal.outcome` was added to the view ([D15](decisions.md#d15-digital-the-reveal-shows-its-outcome)).
+**Status:** approved on 2026-11-11. The routes, RPC surface, rules engine signatures, `PlayerView` shape and hidden-information mapping below are agreed; a material change to any of them needs approval again. The same day the server runtime changed from an Express process to one Durable Object on Cloudflare ([D9](decisions.md#d9-hosting-the-whole-app-in-one-durable-object-on-cloudflare)). The walking skeleton (slice 2) is their first consumer. Later the same day `lastReveal.outcome` was added to the view ([D15](decisions.md#d15-digital-the-reveal-shows-its-outcome)), and each accepted action started returning the room's version ([D17](decisions.md#d17-an-accepted-action-returns-the-rooms-version)).
 
 ## Principles
 
@@ -43,12 +43,12 @@ sequenceDiagram
     S-->>B: Ben's view (version 7)
     A->>S: mutation room.contribute({ code, card: "feature" })
     S->>S: applyAction → accepted, version 8
-    S-->>A: { ok }
+    S-->>A: { version: 8 }
     S-->>A: Ana's view (version 8): her hand shrinks, her contribution shows
     S-->>B: Ben's view (version 8): Ana now shows "contributed"
 ```
 
-- **Actions** are mutations. Each returns a typed result or a declared error such as `WRONG_PHASE` or `CARD_NOT_IN_HAND`. A rejected action fails only that call.
+- **Actions** are mutations. Each returns `{ version }`, the room's version right after it, or a declared error such as `WRONG_PHASE` or `CARD_NOT_IN_HAND`. A rejected action fails only that call and changes nothing. A control stays disabled until its page's view reaches the returned version, so it can't be used again on a view that doesn't show its action yet.
 - **Views** come from one stream per player. It yields the player's current view first, then a fresh view after every accepted action in the room. Because each value is a full snapshot, a reconnect loses nothing: the handler starts over and yields the current view.
 - Launch's `connect()` follows the stream as signals in the room page. It doesn't reconnect on its own, so the page shows its status and calls `reconnect()` when it fails.
 
