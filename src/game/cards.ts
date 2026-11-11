@@ -1,4 +1,13 @@
-export type CardType = 'feature' | 'workaround' | 'tests' | 'refactoring' | 'status' | 'workshop';
+export const cardTypes = [
+  'feature',
+  'workaround',
+  'tests',
+  'refactoring',
+  'status',
+  'workshop',
+] as const;
+
+export type CardType = (typeof cardTypes)[number];
 
 const deckCounts: [card: CardType, count: number][] = [
   ['feature', 11],

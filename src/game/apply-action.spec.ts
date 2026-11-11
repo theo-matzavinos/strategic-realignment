@@ -1,22 +1,8 @@
-import { applyAction } from './apply-action';
-import type { CardType } from './cards';
-import { addPlayer, createGame, type Game, type PlayingGame } from './game';
-
-function lobby(playerCount: number, seed = 1): Game {
-  let game: Game = createGame(seed, 'p1');
-  for (let index = 2; index <= playerCount; index++) {
-    game = addPlayer(game, `p${index}`);
-  }
-  return game;
-}
-
-function started(playerCount: number, seed = 1): PlayingGame {
-  const result = applyAction(lobby(playerCount, seed), 'p1', { type: 'startGame' });
-  if ('code' in result || result.phase !== 'contribute') {
-    throw new Error(`startGame was refused: ${JSON.stringify(result)}`);
-  }
-  return result;
-}
+import { actionSchema, type Action } from './action';
+import { applyAction, type RuleErrorCode } from './apply-action';
+import { cardTypes, type CardType } from './cards';
+import { addPlayer, type ContributeGame, type Game } from './game';
+import { act, lobby, started } from './testing/scenario';
 
 function countCards(cards: CardType[]): Record<string, number> {
   const counts: Record<string, number> = {};
@@ -90,8 +76,8 @@ describe('startGame', () => {
   }
 
   it("raises the Target by 3 when the first demand is The CEO Saw a Competitor's Feature", () => {
-    let ceoFirst: PlayingGame | null = null;
-    let ceoLater: PlayingGame | null = null;
+    let ceoFirst: ContributeGame | null = null;
+    let ceoLater: ContributeGame | null = null;
     for (let seed = 1; seed < 500; seed++) {
       const game = started(5, seed);
       if (game.demands[0] === 'ceoCompetitor') {
@@ -189,5 +175,225 @@ describe('startGame', () => {
     const corrupted = { ...game, players: [...game.players, 'p8'] };
 
     expect(() => applyAction(corrupted, 'p1', { type: 'startGame' })).toThrow();
+  });
+});
+
+describe('refusals after the start', () => {
+  /** Sprint 1 with every player's first card placed except p5's. */
+  function contributing(): Game {
+    let game: Game = started(5);
+    for (const player of ['p1', 'p2', 'p3', 'p4']) {
+      game = act(game, player, { type: 'contribute', card: started(5).hands[player][0] });
+    }
+    return game;
+  }
+
+  function retro(): Game {
+    const game = contributing();
+    return act(game, 'p5', { type: 'contribute', card: started(5).hands['p5'][0] });
+  }
+
+  function voting(): Game {
+    return act(act(retro(), 'p1', { type: 'nominate', nominee: 'p2' }), 'p3', {
+      type: 'vote',
+      yes: true,
+    });
+  }
+
+  function ended(): Game {
+    const game = retro();
+    if (game.phase !== 'retro') {
+      throw new Error('Expected the retro');
+    }
+    return { ...game, phase: 'ended', winner: 'plant', vote: null };
+  }
+
+  const p5Hand = started(5).hands['p5'];
+  let cardNotInHand: CardType = 'feature';
+  for (const card of cardTypes) {
+    if (!p5Hand.includes(card)) {
+      cardNotInHand = card;
+    }
+  }
+
+  const refusals: {
+    name: string;
+    game: Game;
+    playerId: string;
+    action: Action;
+    code: RuleErrorCode;
+  }[] = [
+    {
+      name: 'contribute in the lobby',
+      game: lobby(5),
+      playerId: 'p1',
+      action: { type: 'contribute', card: 'feature' },
+      code: 'WRONG_PHASE',
+    },
+    {
+      name: 'contribute in the retro',
+      game: retro(),
+      playerId: 'p1',
+      action: { type: 'contribute', card: 'feature' },
+      code: 'WRONG_PHASE',
+    },
+    {
+      name: 'nominate while contributing',
+      game: contributing(),
+      playerId: 'p1',
+      action: { type: 'nominate', nominee: 'p2' },
+      code: 'WRONG_PHASE',
+    },
+    {
+      name: 'vote while contributing',
+      game: contributing(),
+      playerId: 'p1',
+      action: { type: 'vote', yes: true },
+      code: 'WRONG_PHASE',
+    },
+    {
+      name: 'finishRetro while contributing',
+      game: contributing(),
+      playerId: 'p1',
+      action: { type: 'finishRetro' },
+      code: 'WRONG_PHASE',
+    },
+    {
+      name: 'nominate after the end',
+      game: ended(),
+      playerId: 'p1',
+      action: { type: 'nominate', nominee: 'p2' },
+      code: 'WRONG_PHASE',
+    },
+    {
+      name: 'finishRetro after the end',
+      game: ended(),
+      playerId: 'p1',
+      action: { type: 'finishRetro' },
+      code: 'WRONG_PHASE',
+    },
+    {
+      name: 'a card not in hand',
+      game: contributing(),
+      playerId: 'p5',
+      action: { type: 'contribute', card: cardNotInHand },
+      code: 'CARD_NOT_IN_HAND',
+    },
+    {
+      name: 'a second contribution',
+      game: contributing(),
+      playerId: 'p1',
+      action: { type: 'contribute', card: started(5).hands['p1'][1] },
+      code: 'ALREADY_CONTRIBUTED',
+    },
+    {
+      name: 'nominating an unknown player',
+      game: retro(),
+      playerId: 'p1',
+      action: { type: 'nominate', nominee: 'p9' },
+      code: 'UNKNOWN_PLAYER',
+    },
+    {
+      name: 'nominating yourself',
+      game: retro(),
+      playerId: 'p1',
+      action: { type: 'nominate', nominee: 'p1' },
+      code: 'SELF_NOMINATION',
+    },
+    {
+      name: 'a second nomination',
+      game: voting(),
+      playerId: 'p4',
+      action: { type: 'nominate', nominee: 'p5' },
+      code: 'VOTE_ALREADY_HELD',
+    },
+    {
+      name: 'voting with no nomination',
+      game: retro(),
+      playerId: 'p1',
+      action: { type: 'vote', yes: true },
+      code: 'NO_VOTE_OPEN',
+    },
+    {
+      name: 'voting twice',
+      game: voting(),
+      playerId: 'p3',
+      action: { type: 'vote', yes: false },
+      code: 'ALREADY_VOTED',
+    },
+    {
+      name: 'finishRetro while a vote is open',
+      game: voting(),
+      playerId: 'p1',
+      action: { type: 'finishRetro' },
+      code: 'VOTE_OPEN',
+    },
+    {
+      name: 'finishRetro twice',
+      game: act(retro(), 'p2', { type: 'finishRetro' }),
+      playerId: 'p2',
+      action: { type: 'finishRetro' },
+      code: 'ALREADY_READY',
+    },
+  ];
+  for (const { name, game, playerId, action, code } of refusals) {
+    it(`refuses ${name} with ${code} and changes nothing`, () => {
+      const before = structuredClone(game);
+
+      expect(applyAction(game, playerId, action)).toEqual({ code });
+      expect(game).toEqual(before);
+    });
+  }
+
+  it('refuses nominating at 0 Audits left with NO_AUDITS_LEFT', () => {
+    // Replayed from two passed audits in the retro tests; a constructed board here.
+    const game = retro();
+    if (game.phase !== 'retro') {
+      throw new Error('Expected the retro');
+    }
+    const noAudits: Game = { ...game, board: { ...game.board, auditsLeft: 0 } };
+
+    expect(applyAction(noAudits, 'p1', { type: 'nominate', nominee: 'p2' })).toEqual({
+      code: 'NO_AUDITS_LEFT',
+    });
+  });
+
+  it('fails clearly for a player who is not seated', () => {
+    expect(() =>
+      applyAction(contributing(), 'p9', { type: 'contribute', card: 'feature' }),
+    ).toThrow();
+  });
+
+  it('leaves the game it was given untouched when it accepts an action', () => {
+    const game = contributing();
+    const before = structuredClone(game);
+
+    act(game, 'p5', { type: 'contribute', card: started(5).hands['p5'][0] });
+
+    expect(game).toEqual(before);
+  });
+});
+
+describe('actionSchema', () => {
+  it('accepts every action and refuses unknown cards and malformed input', () => {
+    for (const action of [
+      { type: 'startGame' },
+      { type: 'contribute', card: 'workshop' },
+      { type: 'nominate', nominee: 'p2' },
+      { type: 'vote', yes: false },
+      { type: 'finishRetro' },
+    ]) {
+      expect(actionSchema.parse(action)).toEqual(action);
+    }
+
+    for (const malformed of [
+      { type: 'contribute', card: 'synergy' },
+      { type: 'contribute' },
+      { type: 'nominate' },
+      { type: 'vote', yes: 'yes' },
+      { type: 'endGame' },
+    ]) {
+      expect(actionSchema.safeParse(malformed).success).toBe(false);
+    }
   });
 });

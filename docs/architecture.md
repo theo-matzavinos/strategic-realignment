@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** approved on 2026-11-11. The routes, RPC surface, rules engine signatures, `PlayerView` shape and hidden-information mapping below are agreed; a material change to any of them needs approval again. The same day the server runtime changed from an Express process to one Durable Object on Cloudflare ([D9](decisions.md#d9-hosting-the-whole-app-in-one-durable-object-on-cloudflare)). The walking skeleton (slice 2) is their first consumer.
+**Status:** approved on 2026-11-11. The routes, RPC surface, rules engine signatures, `PlayerView` shape and hidden-information mapping below are agreed; a material change to any of them needs approval again. The same day the server runtime changed from an Express process to one Durable Object on Cloudflare ([D9](decisions.md#d9-hosting-the-whole-app-in-one-durable-object-on-cloudflare)). The walking skeleton (slice 2) is their first consumer. Later the same day `lastReveal.outcome` was added to the view ([D15](decisions.md#d15-digital-the-reveal-shows-its-outcome)).
 
 ## Principles
 
@@ -104,14 +104,14 @@ function viewFor(room: Room, playerId: PlayerId): PlayerView;
 type PlayerView = {
   code: string;
   version: number;
-  phase: "lobby" | "contribute" | "retro" | "ended";
+  phase: 'lobby' | 'contribute' | 'retro' | 'ended';
   sprint: 1 | 2 | 3 | 4;
   board: { progress: number; target: number; morale: number; debt: number; auditsLeft: number };
   demand: DemandType | null;
   pastDemands: DemandType[];
   me: {
     playerId: PlayerId;
-    role: "plant" | "delivery" | null; // null in the lobby
+    role: 'plant' | 'delivery' | null; // null in the lobby
     hand: CardType[];
     contribution: CardType | null; // this sprint, until the reveal
   };
@@ -129,6 +129,11 @@ type PlayerView = {
     mine: number | null; // index of my card in `cards`
     audited: { playerId: PlayerId; card: CardType } | null;
     oneRemoved: boolean; // true under The Sprint Is Now One Week; the card itself is never sent
+    outcome: {
+      progress: number; // Progress the revealed cards added, after Workshop reductions
+      demandMet: boolean | null; // null when the demand has no requirement
+      incident: boolean;
+    };
   } | null;
   vote: {
     nominee: PlayerId;
@@ -137,28 +142,37 @@ type PlayerView = {
     outcome: { passed: boolean; yes: PlayerId[]; no: PlayerId[] } | null; // once everyone has voted
   } | null;
   retroReady: PlayerId[];
-  result: { winner: "delivery" | "plant"; roles: Record<PlayerId, "plant" | "delivery"> } | null;
+  result: { winner: 'delivery' | 'plant'; roles: Record<PlayerId, 'plant' | 'delivery'> } | null;
 };
 ```
 
 In the digital game, Plan and Contribute are one phase: the team talks on their call while choosing, and the reveal happens as soon as everyone has contributed. A placed card is final, as on paper.
 
+What some fields mean in each phase ([digital rules](rules.md#digital-game)):
+
+- `players[].isAudited`: in `contribute`, plays face up this sprint; in `retro`, will play face up next sprint (the passed vote's nominee); always false in `ended`.
+- `me.contribution` and `players[].hasContributed`: this sprint's placement, only in `contribute`.
+- `lastReveal`: the latest reveal. It stays through the retro, the next `contribute` phase and `ended`.
+- `vote`: in `retro`, and in `ended` only when a passed audit took Morale to 0 and ended the game, so everyone sees the deciding vote (its `outcome` is then complete, with `passed` true). Null in `ended` otherwise. `voted`, `outcome.yes` and `outcome.no` list players in seat order.
+- `retroReady`: only in `retro`, in seat order. `result`: only in `ended`.
+- `sprint` stays at the last sprint played once the game has ended.
+
 ## Hidden information
 
 Each row of the [rules' visibility table](rules.md#who-sees-what) maps to exactly one place in the view, or to none:
 
-| Rule                                                         | In the view                                                           |
-| ------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Your role / others' roles until the end                      | `me.role` / `result.roles`, only when `phase` is `"ended"`            |
-| Your hand / others' hand sizes only                          | `me.hand` / `players[].handSize`                                      |
-| Deck order, unused demands, next demand                      | Nowhere                                                               |
-| Your contribution / whether others contributed               | `me.contribution` / `players[].hasContributed`                        |
-| Revealed cards, shuffled and unattributed                    | `lastReveal.cards`, shuffled on the server, never in submission order |
-| Which revealed card was yours                                | `lastReveal.mine`, computed per player                                |
-| The audited player's card, attributed                        | `lastReveal.audited`                                                  |
-| The card removed by The Sprint Is Now One Week               | Nowhere; only `lastReveal.oneRemoved`                                 |
-| Votes: who has voted / your vote / everyone's, once complete | `vote.voted` / `vote.mine` / `vote.outcome`                           |
-| Board, demands revealed so far, nominations                  | `board`, `demand`, `pastDemands`, `vote.nominee`                      |
+| Rule                                                         | In the view                                                                                                                        |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Your role / others' roles until the end                      | `me.role` / `result.roles`, only when `phase` is `"ended"`                                                                         |
+| Your hand / others' hand sizes only                          | `me.hand` / `players[].handSize`                                                                                                   |
+| Deck order, unused demands, next demand                      | Nowhere                                                                                                                            |
+| Your contribution / whether others contributed               | `me.contribution` / `players[].hasContributed`                                                                                     |
+| Revealed cards, shuffled and unattributed                    | `lastReveal.cards`, shuffled on the server, never in submission order; `lastReveal.outcome` counts only these and the audited card |
+| Which revealed card was yours                                | `lastReveal.mine`, computed per player                                                                                             |
+| The audited player's card, attributed                        | `lastReveal.audited`                                                                                                               |
+| The card removed by The Sprint Is Now One Week               | Nowhere; only `lastReveal.oneRemoved`                                                                                              |
+| Votes: who has voted / your vote / everyone's, once complete | `vote.voted` / `vote.mine` / `vote.outcome`                                                                                        |
+| Board, demands revealed so far, nominations                  | `board`, `demand`, `pastDemands`, `vote.nominee`                                                                                   |
 
 Three leaks the design rules out by construction: card ids (there aren't any), submission order (the server shuffles before building `lastReveal`), and votes trickling in (they're withheld until everyone has voted, matching the simultaneous vote on paper).
 

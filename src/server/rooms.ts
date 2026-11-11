@@ -1,4 +1,4 @@
-import { applyAction, type RuleErrorCode } from '../game/apply-action';
+import { applyAction, type ActionErrorCode } from '../game/apply-action';
 import { addPlayer, createGame, maxPlayers, type Game, type PlayerId } from '../game/game';
 import type { Room } from '../game/room';
 import type { SessionId } from './session';
@@ -88,7 +88,7 @@ export class ServerRoom implements Room {
   }
 
   /** Starts the game for `playerId` through the rules, or says why the rules refused. */
-  startGame(playerId: PlayerId): RuleErrorCode | null {
+  startGame(playerId: PlayerId): ActionErrorCode<'startGame'> | null {
     const result = applyAction(this.#game, playerId, { type: 'startGame' });
     if ('code' in result) {
       return result.code;

@@ -1,6 +1,15 @@
 import type { CardType } from './cards';
 import type { DemandType } from './demands';
-import { startingBoard, startingTarget, type Board, type PlayerId, type Role } from './game';
+import {
+  currentDemand,
+  startingBoard,
+  startingTarget,
+  type AuditVote,
+  type Board,
+  type PlayerId,
+  type Role,
+  type StoredReveal,
+} from './game';
 import type { Room } from './room';
 
 export type PlayerView = {
@@ -31,6 +40,11 @@ export type PlayerView = {
     mine: number | null; // index of my card in `cards`
     audited: { playerId: PlayerId; card: CardType } | null;
     oneRemoved: boolean; // true under The Sprint Is Now One Week; the card itself is never sent
+    outcome: {
+      progress: number; // Progress the revealed cards added, after Workshop reductions
+      demandMet: boolean | null; // null when the demand has no requirement
+      incident: boolean;
+    };
   } | null;
   vote: {
     nominee: PlayerId;
@@ -62,15 +76,22 @@ export function viewFor(room: Room, playerId: PlayerId): PlayerView {
   const pastDemands: DemandType[] = [];
   let role: Role | null = null;
   let hand: CardType[] = [];
+  let contribution: CardType | null = null;
   const handSizes: Record<PlayerId, number> = {};
+  const contributed = new Set<PlayerId>();
+  let audited: PlayerId | null = null;
+  let lastReveal: PlayerView['lastReveal'] = null;
+  let vote: PlayerView['vote'] = null;
+  const retroReady: PlayerId[] = [];
+  let result: PlayerView['result'] = null;
   for (const player of game.players) {
     handSizes[player] = 0;
   }
 
-  if (game.phase === 'contribute') {
+  if (game.phase !== 'lobby') {
     sprint = game.sprint;
     board = { ...game.board };
-    demand = game.demands[game.revealedDemands - 1];
+    demand = currentDemand(game);
     for (let index = 0; index < game.revealedDemands - 1; index++) {
       pastDemands.push(game.demands[index]);
     }
@@ -78,6 +99,46 @@ export function viewFor(room: Room, playerId: PlayerId): PlayerView {
     hand = [...game.hands[playerId]];
     for (const player of game.players) {
       handSizes[player] = game.hands[player].length;
+    }
+    if (game.lastReveal !== null) {
+      lastReveal = revealFor(game.lastReveal, playerId);
+    }
+  }
+
+  if (game.phase === 'contribute') {
+    for (const player of game.players) {
+      if (Object.hasOwn(game.contributions, player)) {
+        contributed.add(player);
+      }
+    }
+    if (Object.hasOwn(game.contributions, playerId)) {
+      contribution = game.contributions[playerId];
+    }
+    audited = game.audited;
+  }
+
+  if (game.phase === 'retro') {
+    audited = game.nextAudited;
+    if (game.vote !== null) {
+      // A vote that passed without ending the game always names next sprint's audited player.
+      vote = voteFor(game.players, game.vote, playerId, game.nextAudited !== null);
+    }
+    for (const player of game.players) {
+      if (game.ready.includes(player)) {
+        retroReady.push(player);
+      }
+    }
+  }
+
+  if (game.phase === 'ended') {
+    const roles: Record<PlayerId, Role> = {};
+    for (const player of game.players) {
+      roles[player] = game.roles[player];
+    }
+    result = { winner: game.winner, roles };
+    if (game.vote !== null) {
+      // Only a passed audit ends the game with its vote kept.
+      vote = voteFor(game.players, game.vote, playerId, true);
     }
   }
 
@@ -88,8 +149,8 @@ export function viewFor(room: Room, playerId: PlayerId): PlayerView {
       name: player.name,
       isHost: player.isHost,
       handSize: handSizes[player.playerId],
-      hasContributed: false,
-      isAudited: false,
+      hasContributed: contributed.has(player.playerId),
+      isAudited: player.playerId === audited,
     });
   }
 
@@ -101,13 +162,84 @@ export function viewFor(room: Room, playerId: PlayerId): PlayerView {
     board,
     demand,
     pastDemands,
-    me: { playerId, role, hand, contribution: null },
+    me: { playerId, role, hand, contribution },
     players,
-    lastReveal: null,
-    vote: null,
-    retroReady: [],
-    result: null,
+    lastReveal,
+    vote,
+    retroReady,
+    result,
   };
+}
+
+/** The public reveal, plus which card was this player's. The owners and the removed card stay out. */
+function revealFor(
+  stored: StoredReveal,
+  playerId: PlayerId,
+): NonNullable<PlayerView['lastReveal']> {
+  const cards: CardType[] = [];
+  let mine: number | null = null;
+  for (let index = 0; index < stored.cards.length; index++) {
+    const revealed = stored.cards[index];
+    cards.push(revealed.card);
+    if (revealed.playerId === playerId) {
+      mine = index;
+    }
+  }
+
+  let audited: NonNullable<PlayerView['lastReveal']>['audited'] = null;
+  if (stored.audited !== null) {
+    audited = { playerId: stored.audited.playerId, card: stored.audited.card };
+  }
+
+  return {
+    sprint: stored.sprint,
+    cards,
+    mine,
+    audited,
+    oneRemoved: stored.removed !== null,
+    outcome: {
+      progress: stored.outcome.progress,
+      demandMet: stored.outcome.demandMet,
+      incident: stored.outcome.incident,
+    },
+  };
+}
+
+/** Who has voted, your own vote, and everyone's only once all votes are in. */
+function voteFor(
+  players: PlayerId[],
+  held: AuditVote,
+  playerId: PlayerId,
+  passed: boolean,
+): NonNullable<PlayerView['vote']> {
+  const voted: PlayerId[] = [];
+  const yes: PlayerId[] = [];
+  const no: PlayerId[] = [];
+  for (const player of players) {
+    if (!Object.hasOwn(held.votes, player)) {
+      continue;
+    }
+
+    voted.push(player);
+    if (held.votes[player]) {
+      yes.push(player);
+    } else {
+      no.push(player);
+    }
+  }
+
+  let mine: boolean | null = null;
+  if (Object.hasOwn(held.votes, playerId)) {
+    mine = held.votes[playerId];
+  }
+
+  let outcome: NonNullable<PlayerView['vote']>['outcome'] = null;
+  const everyoneVoted = voted.length === players.length;
+  if (everyoneVoted) {
+    outcome = { passed, yes, no };
+  }
+
+  return { nominee: held.nominee, voted, mine, outcome };
 }
 
 /** The room's roster and the game's must be the same players, in the same order, with the same host. */

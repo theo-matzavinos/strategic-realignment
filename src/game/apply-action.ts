@@ -1,102 +1,54 @@
 import type { Action } from './action';
-import { contributionDeck, type CardType } from './cards';
-import { ceoTargetIncrease, demandDeck } from './demands';
-import {
-  maxPlayers,
-  minPlayers,
-  startingBoard,
-  startingTarget,
-  type Game,
-  type LobbyGame,
-  type PlayerId,
-  type PlayingGame,
-  type Role,
-} from './game';
-import { shuffle } from './random';
+import { contribute } from './contribute';
+import type { Game, PlayerId } from './game';
+import { finishRetro, nominate, vote } from './retro';
+import type { RuleError } from './rule-error';
+import { startGame } from './start-game';
 
-export type RuleErrorCode = 'NOT_HOST' | 'NOT_ENOUGH_PLAYERS' | 'WRONG_PHASE';
+export type { RuleError, RuleErrorCode } from './rule-error';
 
-export type RuleError = { code: RuleErrorCode };
+/** The refusal codes each action can return, so each RPC mutation declares only its own. */
+export type ActionErrorCode<Type extends Action['type']> = {
+  startGame: RefusalOf<typeof startGame>;
+  contribute: RefusalOf<typeof contribute>;
+  nominate: RefusalOf<typeof nominate>;
+  vote: RefusalOf<typeof vote>;
+  finishRetro: RefusalOf<typeof finishRetro>;
+}[Type];
 
-const handSize = 3;
-const demandsPerGame = 4;
+type RefusalOf<Handler extends (...args: never[]) => unknown> = Extract<
+  ReturnType<Handler>,
+  RuleError
+>['code'];
 
 /** Applies one validated action. Returns the next game, or why the action is refused. */
+export function applyAction<Validated extends Action>(
+  game: Game,
+  playerId: PlayerId,
+  action: Validated,
+): Game | RuleError<ActionErrorCode<Validated['type']>>;
 export function applyAction(game: Game, playerId: PlayerId, action: Action): Game | RuleError {
+  if (!game.players.includes(playerId)) {
+    // The server only acts for seated players, so this is a bug, not a refused action.
+    throw new Error(`Player ${playerId} isn't seated in this game`);
+  }
+
+  const logged = { playerId, action };
   switch (action.type) {
     case 'startGame': {
-      return startGame(game, playerId, action);
+      return startGame(game, logged);
+    }
+    case 'contribute': {
+      return contribute(game, logged, action.card);
+    }
+    case 'nominate': {
+      return nominate(game, logged, action.nominee);
+    }
+    case 'vote': {
+      return vote(game, logged, action.yes);
+    }
+    case 'finishRetro': {
+      return finishRetro(game, logged);
     }
   }
-}
-
-function startGame(game: Game, playerId: PlayerId, action: Action): PlayingGame | RuleError {
-  if (game.phase !== 'lobby') {
-    return { code: 'WRONG_PHASE' };
-  }
-
-  if (playerId !== game.host) {
-    return { code: 'NOT_HOST' };
-  }
-
-  if (game.players.length < minPlayers) {
-    return { code: 'NOT_ENOUGH_PLAYERS' };
-  }
-
-  if (game.players.length > maxPlayers) {
-    // addPlayer never seats an 8th player, so this is a corrupted game, not a refused action.
-    throw new Error(`A lobby can't hold ${game.players.length} players`);
-  }
-
-  return setUp(game, { playerId, action });
-}
-
-/** Rules v0 Setup, then sprint 1's Demand step. Draw is a no-op: every hand starts full. */
-function setUp(game: LobbyGame, logged: { playerId: PlayerId; action: Action }): PlayingGame {
-  const playerCount = game.players.length;
-
-  const roleCards: Role[] = ['plant'];
-  for (let index = 1; index < playerCount; index++) {
-    roleCards.push('delivery');
-  }
-  const shuffledRoles = shuffle(roleCards, game.random);
-
-  const shuffledDeck = shuffle(contributionDeck(), shuffledRoles.state);
-  const deck = shuffledDeck.items;
-
-  const shuffledDemands = shuffle(demandDeck, shuffledDeck.state);
-  const demands = shuffledDemands.items.slice(0, demandsPerGame);
-  const unusedDemands = shuffledDemands.items.slice(demandsPerGame);
-
-  const roles: Record<PlayerId, Role> = {};
-  const hands: Record<PlayerId, CardType[]> = {};
-  for (let seat = 0; seat < playerCount; seat++) {
-    const player = game.players[seat];
-    roles[player] = shuffledRoles.items[seat];
-    hands[player] = deck.splice(0, handSize);
-  }
-
-  let target = startingTarget(playerCount);
-  const firstDemand = demands[0];
-  if (firstDemand === 'ceoCompetitor') {
-    target += ceoTargetIncrease;
-  }
-
-  return {
-    seed: game.seed,
-    random: shuffledDemands.state,
-    host: game.host,
-    players: [...game.players],
-    log: [...game.log, logged],
-    phase: 'contribute',
-    sprint: 1,
-    board: { ...startingBoard, target },
-    roles,
-    hands,
-    deck,
-    discard: [],
-    demands,
-    revealedDemands: 1,
-    unusedDemands,
-  };
 }

@@ -143,3 +143,52 @@ The source is public. Team game sessions run on a private deployment, to be chos
 **Chosen:** pass it at deploy time: `wrangler deploy --domain <host> --var APP_HOST:<host>`. The Durable Object builds the app's handler with `APP_HOST` as the only allowed host; without it, only `localhost` and `127.0.0.1` are allowed, so a deploy that forgets the variable refuses every request instead of accepting any host. `workers_dev` and preview URLs are off, so the custom domain behind Access is the only way in.
 
 **Why:** the repository is public and the deployment is private (D7). Access already gates the hostname, so publishing it would only advertise the login page, but keeping it out costs one command-line flag and a few lines in the Worker.
+
+## D13. Digital: retro ends when everyone is ready
+
+**2026-11-11**
+
+**Context:** on paper the retro ends when the table stops talking. The browser game needs an explicit end, and the next sprint's draw and demand follow from it.
+
+**Options:**
+
+- **Everyone marks ready; a nomination clears the marks.** The next sprint starts when all players are ready and no vote is open.
+- **Everyone marks ready, and marks survive a nomination.**
+- **The host ends the retro.**
+
+**Chosen:** everyone marks ready. A nomination clears every ready mark, nobody can mark ready while a vote is open, and a mark can't be withdrawn ([rules](rules.md#digital-game)).
+
+**Why:** an audit's outcome is new information the team should discuss, so a ready mark given before it no longer means "I've said my piece". Keeping marks would let a retro end the moment the last vote lands. A host-ended retro gives one player control over when suspicion stops being discussed, which matters in a hidden-role game. The cost: one player who never marks ready stalls the retro, like an absent player stalls a sprint.
+
+## D14. Digital: the audited card shows at the reveal
+
+**2026-11-11**
+
+**Options:** show the audited player's card, attributed, at the reveal; or as soon as it's placed, as on paper.
+
+**Chosen:** at the reveal, in `lastReveal.audited` ([rules](rules.md#digital-game)).
+
+**Why:** it fits the approved view as it is; showing it on placement would need a new view field for the current sprint. On paper the others could react to the face-up card while still choosing theirs; in the browser game they can't, so the audited player's card no longer steers the rest of the sprint.
+
+## D15. Digital: the reveal shows its outcome
+
+**2026-11-11**
+
+**Options:** add `lastReveal.outcome` (Progress gained after Workshop reductions, whether the demand was met, whether an incident happened) to the view; or no addition, showing only the revealed cards and the new board.
+
+**Chosen:** add `outcome`, the one change to the approved `PlayerView` ([architecture](architecture.md#the-view)).
+
+**Why:** it's public information at a table, where everyone watches the cards being counted. Without it the client would recompute the rules, which the architecture rules out, or players would check the demand by hand and guess whether Debt moved through an incident.
+
+## D16. Digital rules defaults
+
+**2026-11-11**
+
+**Chosen**, as defaults for the browser game ([rules](rules.md#digital-game)):
+
+- **Nominations:** the first nomination in a retro is its one vote and can't be withdrawn; any other player, never yourself; only while Audits left is above 0. Everyone votes, including the nominee; votes are final and show once all are in.
+- **The audited card is never removed** by The Sprint Is Now One Week, which removes one of the face-down cards. The audited player has no index among the shuffled cards.
+- **A removed card is yours if none of the revealed ones is.** Your view marks which revealed card is yours, so the owner of the removed card learns it was theirs. On paper they'd learn it only when no card of their type showed up. Nobody else learns anything, and the card is never sent.
+- **Draw at the start of the next sprint,** so hands hold 2 cards during the retro. At v0 numbers the deck never runs out, so the reshuffle rule is covered by a unit test on a constructed game only.
+
+**Why:** each follows the paper rules as closely as the browser allows, and none needs a new view field.

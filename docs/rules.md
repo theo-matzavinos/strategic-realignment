@@ -131,6 +131,21 @@ In planning, Ana and Ben say they'll cover Testing, and everyone else promises F
 
 The retro writes itself. Testing was already covered, so who brought the Workshop? Its player says they didn't trust the Testing promises and wanted the requirement guaranteed. And the Workaround came from someone who promised Feature Work.
 
+## Digital game
+
+The browser game plays these rules with a few clarifications where a table would just talk it out ([D13](decisions.md#d13-digital-retro-ends-when-everyone-is-ready), [D14](decisions.md#d14-digital-the-audited-card-shows-at-the-reveal), [D15](decisions.md#d15-digital-the-reveal-shows-its-outcome), [D16](decisions.md#d16-digital-rules-defaults)).
+
+- **Plan and Contribute are one step.** There are no timers for Plan or Retro; the team talks on its call while choosing.
+- **The reveal happens the moment the last player contributes.** A placed card is final. The server shuffles the face-down cards and shows them unattributed.
+- **Retro only after sprints 1–3.** After sprint 4 resolves, or whenever Morale reaches 0 (in Resolve or after a passed audit), the game ends and every role is shown.
+- **One incident per sprint.** Debt 5 becomes 2; the incident doesn't repeat. Progress never goes below 0.
+- **The retro ends when everyone is ready.** Each player marks themselves ready; when all are ready and no vote is open, the next sprint starts. A nomination clears every ready mark, since its outcome is new to discuss. Nobody can mark ready while a vote is open, and a ready mark can't be withdrawn.
+- **Nominations.** The first nomination in a retro is that retro's one vote, and it can't be withdrawn. You nominate another player, never yourself, and only while Audits left is above 0. Everyone votes, including the nominee; votes are final, and who voted how shows once all have voted.
+- **The audited card shows at the reveal,** face up and attributed, not when it's placed.
+- **The audited card is never removed.** The Sprint Is Now One Week removes one of the face-down cards only. The audited player has no card among the shuffled ones.
+- **If your card is the one removed,** the game shows you that none of the revealed cards is yours, so you learn it was yours. Nobody else learns anything, and the removed card is never shown.
+- **Draw happens when the next sprint starts,** so hands hold 2 cards during the retro. At these numbers the deck never runs out (7 players draw 21 + 3 × 7 = 42 of 44 cards), but the reshuffle rule is implemented anyway.
+
 ## Questions for the first playtest
 
 The main question: can players build a reasoned suspicion from decisions and outcomes, while the accused still has a believable defense?
