@@ -19,7 +19,7 @@
       "prefix": "app",
       "architect": {
         "build": {
-          "builder": "@angular/build:application",
+          "builder": "@loozo/angular-launch:application",
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
@@ -38,8 +38,14 @@
               "allowedHosts": []
             },
             "ssr": {
-              "entry": "src/server.ts"
-            }
+              "entry": "src/server.ts",
+              "platform": "neutral"
+            },
+            "tsconfig": "tsconfig.app.json",
+            "scanDirectories": [
+              "src/routes"
+            ],
+            "outDirectory": "generated"
           },
           "configurations": {
             "production": {
@@ -61,12 +67,15 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "check": {
+              "check": true
             }
           },
           "defaultConfiguration": "production"
         },
         "serve": {
-          "builder": "@angular/build:dev-server",
+          "builder": "@loozo/angular-launch:serve",
           "configurations": {
             "production": {
               "buildTarget": "strategic-realignment:build:production"

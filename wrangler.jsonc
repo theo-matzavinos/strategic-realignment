@@ -1,0 +1,17 @@
+// Local development only (`wrangler dev`); deploying is a later slice and needs its own settings.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "strategic-realignment",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-11",
+  "assets": {
+    "directory": "./dist/strategic-realignment/browser",
+    // Page URLs fall through to the Worker, which server-renders them, instead of an SPA fallback.
+    "html_handling": "none",
+    "not_found_handling": "none",
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Rooms" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Rooms"] }],
+}

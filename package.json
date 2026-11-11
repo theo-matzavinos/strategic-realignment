@@ -1,4 +1,7 @@
 {
+  "imports": {
+    "#ui/*": "./src/ui/*/index.ts"
+  },
   "name": "strategic-realignment",
   "version": "0.0.0",
   "scripts": {
@@ -7,7 +10,9 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:strategic-realignment": "node dist/strategic-realignment/server/server.mjs"
+    "check": "ng run strategic-realignment:build:check",
+    "preview": "ng build && wrangler dev --ip 127.0.0.1 --port 8787",
+    "e2e": "playwright test"
   },
   "private": true,
   "packageManager": "npm@11.19.0",
@@ -20,8 +25,13 @@
     "@angular/platform-server": "22.2.2",
     "@angular/router": "22.2.2",
     "@angular/ssr": "22.2.2",
-    "express": "^5.1.0",
+    "@fontsource-variable/hanken-grotesk": "5.3.0",
+    "@loozo/angular-launch": "0.0.6",
+    "@loozo/angular-router": "0.0.8",
+    "@loozo/origami-ui": "0.0.4",
+    "@lucide/angular": "1.62.0",
     "rxjs": "7.8.2",
+    "tailwind-variants": "3.3.1",
     "tslib": "^2.3.0",
     "zod": "4.6.7"
   },
@@ -29,14 +39,16 @@
     "@angular/build": "22.2.2",
     "@angular/cli": "22.2.2",
     "@angular/compiler-cli": "22.2.2",
-    "@tailwindcss/postcss": "^4.1.12",
-    "@types/express": "^5.0.1",
+    "@loozo/fold-ui": "0.0.2",
+    "@playwright/test": "1.65.0",
+    "@tailwindcss/postcss": "4.3.3",
     "@types/node": "^22.12.0",
     "jsdom": "^30.0.0",
     "postcss": "^8.5.3",
     "prettier": "^3.8.1",
-    "tailwindcss": "^4.1.12",
+    "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "vitest": "4.1.12"
+    "vitest": "4.1.12",
+    "wrangler": "4.160.0"
   }
 }

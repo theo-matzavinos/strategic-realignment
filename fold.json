@@ -1,0 +1,5 @@
+{
+  "$schema": "./node_modules/@loozo/fold-ui/schematics/fold.schema.json",
+  "prefix": "fold",
+  "path": "src/ui"
+}
