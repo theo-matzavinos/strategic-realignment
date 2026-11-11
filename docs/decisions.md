@@ -91,3 +91,45 @@ The source is public. Team game sessions run on a private deployment, to be chos
 | **6 Workshops at −2 each, incidents −5**                    | **25% / 23%** |
 
 **Chosen:** the last variant, with the Target at 5 × players − 2: an even game for a Plant that sabotages about 60% of the time. Every number stays a knob for the paper playtest, which matters more than the simulation: the simulated team coordinates perfectly, so real tables will likely score lower.
+
+## D9. Hosting: the whole app in one Durable Object on Cloudflare
+
+**2026-11-11**
+
+**Context:** the server keeps every room in memory, so exactly one instance must serve all players, and each player holds a server-sent-event stream open for a whole game (about 20–30 minutes, often idle between actions). Launch 0.0.6 sends a keep-alive comment every 15 seconds and the headers that ask proxies not to buffer. We have a paid Cloudflare Workers account.
+
+**Options:**
+
+| Option                                              | For                                                                                                                                     | Against                                                                                                                                                                          |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **One Durable Object running the app (workerd)**    | No Docker; isolate start instead of a container boot; local runs use the same runtime as production; within the paid plan's allowances. | Changes the Stack's server entry (Express → Launch's neutral fetch entry). Launch streams weren't verified on workerd before. Closed streams were cleaned up ~30 s late locally. |
+| One Cloudflare Container running the Express server | No architecture change; prompt cleanup (~13 ms) on Node.                                                                                | Dockerfile and image builds; 1–3 s cold start; the Worker → Durable Object → Container streaming chain is extra moving parts.                                                    |
+| Homelab behind a Cloudflare Tunnel                  | No extra cost; fits the lab's Compose workflow.                                                                                         | Sessions depend on home power and connection; a new public entry point into the lab.                                                                                             |
+| Render or Fly.io, one instance                      | Managed Node hosting, US$3–7/month.                                                                                                     | No built-in visitor gate (see D10); Render caps a response at 100 minutes; Fly's streaming limits aren't documented.                                                             |
+| Railway, Koyeb, Cloud Run                           | —                                                                                                                                       | Railway ends responses after 15 minutes; Koyeb documents a 100 s HTTP timeout without exempting streams; Cloud Run's maximum of one instance can be briefly exceeded.            |
+
+**Chosen:** a Worker forwards every request except static files to one Durable Object with a fixed name, which runs the whole app: server rendering, Launch's RPC handler and the in-memory rooms. Static files come from Workers Static Assets.
+
+**Why:** both runtimes passed the same local prototype: five isolated browsers created and joined a room by code, saw each other arrive and saw one action sync, and an idle stream stayed open past three minutes with keep-alives every 15 seconds. The Durable Object needs fewer parts to deploy, and it exercises Launch on workerd, which is the kind of gap D3 expects this project to find. The 30-second cleanup delay costs a little memory for a closed stream, not correctness.
+
+**Fallback:** if the deployed stream doesn't survive a 35-minute soak test with seven clients and several idle minutes between actions, we switch to the Container option, which keeps the same app code apart from the server entry.
+
+## D10. Private access: Cloudflare Access with email one-time PINs
+
+**2026-11-11**
+
+**Options:** an unlisted URL only; a shared passcode in the app; Cloudflare Access in front of the app.
+
+**Chosen:** Cloudflare Access on a subdomain of a domain we already have on Cloudflare, letting in an allowlist of colleagues' email addresses by one-time PIN.
+
+**Why:** it gates every page, call and stream without app code, it's free for small teams, and colleagues need no account. An unlisted URL lets anyone with the link in; a passcode would be new code to write and maintain. When an Access login expires mid-game, the stream's reconnect fails and the room page says so; reloading the page logs in again.
+
+## D11. The walking skeleton's synced action: start the game for real
+
+**2026-11-11**
+
+**Options:** a stand-in action that only changes the phase; `startGame` with the real setup from the rules.
+
+**Chosen:** `startGame` runs the real setup: seeded roles, three-card hands, four of the six demands, the Target and the first demand.
+
+**Why:** each player's view must then show only their own role and hand, so the walking skeleton tests hidden information end to end and not just the transport. A phase-only stand-in would show `role: null` outside the lobby, which the hidden-information mapping doesn't allow, and slice 3 would throw it away.

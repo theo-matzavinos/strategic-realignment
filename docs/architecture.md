@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** approved on 2026-11-11. The routes, RPC surface, rules engine signatures, `PlayerView` shape and hidden-information mapping below are agreed; a material change to any of them needs approval again. The walking skeleton (slice 2) is their first consumer.
+**Status:** approved on 2026-11-11. The routes, RPC surface, rules engine signatures, `PlayerView` shape and hidden-information mapping below are agreed; a material change to any of them needs approval again. The same day the server runtime changed from an Express process to one Durable Object on Cloudflare ([D9](decisions.md#d9-hosting-the-whole-app-in-one-durable-object-on-cloudflare)). The walking skeleton (slice 2) is their first consumer.
 
 ## Principles
 
@@ -13,14 +13,15 @@
 
 Pinned as of 2026-11-11.
 
-| Part         | Choice                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------- |
-| Framework    | Angular 22.2 with server rendering, on Node 24                                                          |
-| Routing      | `@loozo/angular-router` 0.0.8: filesystem routes with typed parameters                                  |
-| Server calls | `@loozo/angular-launch` 0.0.6: typed queries, mutations and streams colocated with routes               |
-| UI           | `@loozo/origami-ui` 0.0.4 (headless behavior) and `@loozo/fold-ui` 0.0.2 (styled parts, Tailwind CSS 4) |
-| Validation   | zod schemas for every action, shared by the client and the server                                       |
-| Server       | The Express server entry from Launch's setup, one process, rooms in memory                              |
+| Part         | Choice                                                                                                                                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework    | Angular 22.2 with server rendering, built with Node 24                                                                                                                                                                    |
+| Routing      | `@loozo/angular-router` 0.0.8: filesystem routes with typed parameters                                                                                                                                                    |
+| Server calls | `@loozo/angular-launch` 0.0.6: typed queries, mutations and streams colocated with routes                                                                                                                                 |
+| UI           | `@loozo/origami-ui` 0.0.4 (headless behavior) and `@loozo/fold-ui` 0.0.2 (styled parts, Tailwind CSS 4)                                                                                                                   |
+| Validation   | zod schemas for every action, shared by the client and the server                                                                                                                                                         |
+| Server       | Launch's neutral (fetch) server entry inside one fixed-name Cloudflare Durable Object, rooms in its memory; a Worker forwards every request except static files to it, and Workers Static Assets serves the browser files |
+| Access       | Cloudflare Access with email one-time PINs ([D10](decisions.md#d10-private-access-cloudflare-access-with-email-one-time-pins))                                                                                            |
 
 ## Routes
 
@@ -77,7 +78,7 @@ view: stream({
 
 | State                                        | Owner                                                                                       |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Rooms, players, games, seeds and action logs | Server memory: a `Map` from room code to room                                               |
+| Rooms, players, games, seeds and action logs | The Durable Object's memory: a `Map` from room code to room                                 |
 | Who you are                                  | An `httpOnly` session cookie with a random id; the server maps it to your seat in each room |
 | The current view                             | Server-computed; the client only renders the latest one                                     |
 | Form input, open dialogs, the selected card  | The client                                                                                  |
@@ -163,9 +164,9 @@ Three leaks the design rules out by construction: card ids (there aren't any), s
 
 ## Known limits in v0
 
-- **One process, in memory.** A restart ends every game in progress. Fine for team sessions; durable storage is out of scope.
+- **One Durable Object, in memory.** A deploy, a Cloudflare runtime update, or eviction once nobody is connected ends every game in progress. Fine for team sessions; durable storage is out of scope.
 - **Absent players block the game.** A player who never contributes stalls the sprint; reloading the page restores their seat through the cookie. No timeouts or seat replacement yet.
-- **Six streams per browser over HTTP/1.1.** Browsers allow 6 connections per origin over HTTP/1.1, and each open stream holds one, so a seventh tab in the same browser stalls. It doesn't affect real players on their own devices, and tests use separate browser contexts. HTTP/2 lifts it.
+- **Six streams per browser over HTTP/1.1.** Browsers allow 6 connections per origin over HTTP/1.1, and each open stream holds one, so a seventh tab in the same browser stalls. Cloudflare serves HTTP/2 to browsers, which lifts it in production; local runs are HTTP/1.1, so tests use separate browser contexts.
 - **No in-game chat.** The team talks on their usual call.
 - **The room page doesn't render the game on the server.** Streams don't run during server rendering, so the page renders its shell and fills in when the stream connects.
 
