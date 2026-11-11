@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { newPlayerContext } from './access';
 
 const names = ['Ana', 'Ben', 'Chloe', 'Dimitri', 'Eleni'];
 
@@ -101,7 +102,7 @@ test('five isolated players create, join and start a game, each seeing only thei
 
   try {
     for (let index = 0; index < names.length; index++) {
-      contexts.push(await browser.newContext({ baseURL }));
+      contexts.push(await newPlayerContext(browser, baseURL));
     }
     const pages: Page[] = [];
     for (const context of contexts) {
@@ -243,8 +244,8 @@ test('a browser without a seat gets a join form on the room page, and nothing el
   baseURL,
   request,
 }) => {
-  const owner = await browser.newContext({ baseURL });
-  const outsider = await browser.newContext({ baseURL });
+  const owner = await newPlayerContext(browser, baseURL);
+  const outsider = await newPlayerContext(browser, baseURL);
 
   try {
     const ownerPage = await owner.newPage();

@@ -1,9 +1,15 @@
-// Local development only (`wrangler dev`); deploying is a later slice and needs its own settings.
+// `wrangler dev` runs this locally. A deployment adds its hostname on the command line, so it stays
+// out of this public repository:
+//   wrangler deploy --domain <host> --var APP_HOST:<host>
+// Cloudflare Access must already protect <host>; workers.dev and preview URLs are off so nothing
+// reaches the app around it.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "strategic-realignment",
   "main": "src/worker.ts",
   "compatibility_date": "2026-11-11",
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": "./dist/strategic-realignment/browser",
     // Page URLs fall through to the Worker, which server-renders them, instead of an SPA fallback.

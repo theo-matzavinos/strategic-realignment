@@ -6,7 +6,7 @@ A browser game about shipping software in a toxic workplace. A team has four spr
 >
 > "No, this is literally our normal development process."
 
-**Status:** design. The rules are ready for a paper playtest; no code yet.
+**Status:** walking skeleton. Players can create a room, join it by code from their own devices and start a game, each seeing only their own role and hand. The rest of the game comes next; the rules are ready for a paper playtest.
 
 This project is also a worked example of the process behind it, documented from design to verification:
 

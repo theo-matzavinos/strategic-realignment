@@ -133,3 +133,13 @@ The source is public. Team game sessions run on a private deployment, to be chos
 **Chosen:** `startGame` runs the real setup: seeded roles, three-card hands, four of the six demands, the Target and the first demand.
 
 **Why:** each player's view must then show only their own role and hand, so the walking skeleton tests hidden information end to end and not just the transport. A phase-only stand-in would show `role: null` outside the lobby, which the hidden-information mapping doesn't allow, and slice 3 would throw it away.
+
+## D12. The deployment's hostname stays out of the repository
+
+**2026-11-11**
+
+**Options:** write the hostname into `wrangler.jsonc` and the server's allowed hosts; or pass it at deploy time.
+
+**Chosen:** pass it at deploy time: `wrangler deploy --domain <host> --var APP_HOST:<host>`. The Durable Object builds the app's handler with `APP_HOST` as the only allowed host; without it, only `localhost` and `127.0.0.1` are allowed, so a deploy that forgets the variable refuses every request instead of accepting any host. `workers_dev` and preview URLs are off, so the custom domain behind Access is the only way in.
+
+**Why:** the repository is public and the deployment is private (D7). Access already gates the hostname, so publishing it would only advertise the login page, but keeping it out costs one command-line flag and a few lines in the Worker.
