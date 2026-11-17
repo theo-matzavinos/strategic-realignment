@@ -1,19 +1,15 @@
 import { Component, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Button } from '#ui/button';
-import { minPlayers } from '../../../game/game';
-import type { PlayerView } from '../../../game/view';
+import { ButtonLink } from '#ui/button';
 import { JoinRoomForm } from '../../+lobby/join-room-form';
-import { panel } from './panel';
-import { PlayersPanel } from './players-panel';
-import { RoomRequest } from './room-request';
 import { RoomTable } from './room-table';
 import { injectRoute } from './route.generated';
 import { injectRpc } from './rpc.generated';
 import { TopBar } from './top-bar';
+import { WaitingRoom } from './waiting-room';
 
 @Component({
-  imports: [Button, JoinRoomForm, PlayersPanel, RoomTable, RouterLink, TopBar],
+  imports: [ButtonLink, JoinRoomForm, RoomTable, RouterLink, TopBar, WaitingRoom],
   template: `
     <div class="flex min-h-dvh flex-col">
       <app-top-bar
@@ -26,46 +22,26 @@ import { TopBar } from './top-bar';
       />
 
       @if (invalidCode()) {
-        <main class="mx-auto w-full max-w-3xl px-4 py-10">
-          <p>This isn't a room code. <a routerLink="/" class="underline">Back to the lobby</a></p>
+        <main [class]="centered">
+          <section aria-labelledby="invalid-heading" [class]="panel">
+            <h2 id="invalid-heading" class="text-headline">This isn't a room code.</h2>
+            <a foldButton size="lg" routerLink="/" class="self-start">Back to the lobby</a>
+          </section>
         </main>
       } @else if (refused()) {
-        <main class="mx-auto w-full max-w-3xl px-4 py-10">
+        <main [class]="centered">
           <section aria-labelledby="join-heading" [class]="panel">
-            <h2 id="join-heading" class="text-headline">Join this room</h2>
-            <p class="text-fg-muted">You don't have a seat in this room yet.</p>
+            <div class="flex flex-col gap-1.5">
+              <h2 id="join-heading" class="text-headline">Join this room</h2>
+              <p class="text-fg-muted">You don't have a seat in this room yet.</p>
+            </div>
             <app-join-room-form [code]="code()" (joined)="view.reconnect()" />
           </section>
         </main>
       } @else if (view.value(); as room) {
         @if (room.phase === 'lobby') {
-          <main class="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10 wrap-anywhere">
-            <app-players-panel [room]="room" />
-
-            @if (isHost(room)) {
-              <div class="flex flex-col items-start gap-2">
-                <button
-                  foldButton
-                  variant="primary"
-                  size="lg"
-                  [disabled]="start.pending() || room.players.length < minPlayers"
-                  focusableWhenDisabled
-                  (click)="startGame()"
-                >
-                  Start the game
-                </button>
-                @if (room.players.length < minPlayers) {
-                  <p class="text-fg-muted">
-                    The game needs at least {{ minPlayers }} players. Share the code above.
-                  </p>
-                }
-                @if (start.error(); as message) {
-                  <p role="alert" class="text-bad">{{ message }}</p>
-                }
-              </div>
-            } @else {
-              <p class="text-fg-muted">Waiting for the host to start the game.</p>
-            }
+          <main [class]="centered">
+            <app-waiting-room [room]="room" />
           </main>
         } @else {
           <main class="flex flex-1 flex-col">
@@ -73,7 +49,7 @@ import { TopBar } from './top-bar';
           </main>
         }
       } @else {
-        <main class="mx-auto w-full max-w-3xl px-4 py-10">
+        <main [class]="centered">
           <p class="text-fg-muted">Loading the room…</p>
         </main>
       }
@@ -84,8 +60,12 @@ export default class RoomPage {
   readonly #route = injectRoute();
   readonly #rpc = injectRpc();
 
-  protected readonly panel = panel;
-  protected readonly minPlayers = minPlayers;
+  /** The states outside the game sit in the middle of the page, under the top bar. */
+  protected readonly centered =
+    'grid flex-1 grid-cols-[minmax(0,1fr)] place-items-center px-4 pt-6 pb-10 md:py-12';
+  /** The join form's panel, as on the lobby page. */
+  protected readonly panel =
+    'flex w-[430px] max-w-full flex-col gap-3.5 rounded-dialog border border-line bg-raised p-6.5 shadow-dialog max-md:p-5';
 
   protected readonly code = computed(() => this.#route.params().code.toUpperCase());
   protected readonly view = this.#rpc.room.view.connect({
@@ -127,32 +107,14 @@ export default class RoomPage {
         if (this.refused()) {
           return 'Not in this room';
         }
+        if (this.invalidCode()) {
+          return 'Not a room code';
+        }
 
         return 'Connection lost';
       }
     }
   });
-
-  protected readonly start = new RoomRequest(this.view.value);
-
-  protected isHost(room: PlayerView): boolean {
-    for (const player of room.players) {
-      if (player.isHost) {
-        return player.playerId === room.me.playerId;
-      }
-    }
-
-    return false;
-  }
-
-  protected startGame(): void {
-    const room = this.view.value();
-    if (room === null || room.players.length < minPlayers) {
-      return;
-    }
-
-    void this.start.send(() => this.#rpc.room.startGame({ code: this.code() }));
-  }
 
   #failedWith(code: 'FORBIDDEN' | 'INVALID_INPUT'): boolean {
     const error = this.view.error();

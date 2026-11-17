@@ -1,8 +1,13 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
-/** The rows of the waiting list, while the room waits for the host to start. */
+/** The waiting room: the meeting invite the room shows until the host starts the game. */
+export function waitingRoom(page: Page) {
+  return page.getByRole('region', { name: 'Release: Q3 Platform Excellence' });
+}
+
+/** The invite's accepted attendees, while the room waits for the host to start. */
 export function players(page: Page) {
-  return page.getByRole('region', { name: 'Players' }).getByRole('listitem');
+  return waitingRoom(page).getByRole('list', { name: 'Attendees' }).getByRole('listitem');
 }
 
 /** The rows of the attendee list, once the game is on. */
@@ -184,8 +189,9 @@ const middleWidths = [721, 800, 1024, 1279];
 /**
  * No text or control on the page is cut off: no text runs past an ancestor that hides overflow (or
  * past the screen, outside a sideways scroller), and no button's or label's content is wider than
- * it. On the day view it checks each day's lane, then returns to the day that was shown. From a desktop
- * width it also checks the widths in between, then restores the window.
+ * it. On the day view it checks each day's lane, then returns to the day that was shown; outside a
+ * game it checks the page as it is. From a desktop width it also checks the widths in between, then
+ * restores the window.
  */
 export async function expectNothingClipped(page: Page): Promise<void> {
   const viewport = page.viewportSize()!;
@@ -197,7 +203,9 @@ export async function expectNothingClipped(page: Page): Promise<void> {
   for (const width of widths) {
     await page.setViewportSize({ width, height: viewport.height });
     const tabs = page.getByRole('group', { name: 'Days' });
-    if (!isPhone(page)) {
+    // Outside a game, such as the lobby or the waiting room, there's no day view to step through.
+    const hasDays = (await tabs.count()) > 0;
+    if (!isPhone(page) || !hasDays) {
       expect(await page.evaluate(findClipping), `at ${width} px`).toEqual([]);
       continue;
     }

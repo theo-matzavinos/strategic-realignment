@@ -136,7 +136,7 @@ components:
 
 # Design System: Strategic Realignment
 
-Recorded from what the room page ships after the Sprint Calendar redesign (slices 1 and 2). The approved plan and mock live in the work-evidence folder `sr-sprint-calendar-redesign`; product truth is `PRODUCT.md`. Tokens live once, in `src/ui/theme.css`; Tailwind reads them through `@theme inline`.
+Recorded from what the lobby and the room page ship after the Sprint Calendar redesign (slices 1–3). The approved plan and mock live in the work-evidence folder `sr-sprint-calendar-redesign`; product truth is `PRODUCT.md`. Tokens live once, in `src/ui/theme.css`; Tailwind reads them through `@theme inline`.
 
 ## Overview
 
@@ -201,17 +201,17 @@ Each card type has a hue, used for its band, its tint on calendar events and its
 
 ### Hierarchy
 
-- **Display** (800, 30px, 1.1, −0.02em): the end invite's title (24px on a phone).
+- **Display** (800, 30px, 1.1, −0.02em): the titles of the two invites, the waiting room's and the end's (24px on a phone).
 - **Headline** (800, 22px, 1.2): panel headings outside the game, such as "Join this room".
 - **Title** (700, 15px, 1.3): day names, event titles ("Sprint Review", "Retro · now"), the Now hint.
 - **Body** (400, 14px, 1.4): running text.
 - **Label** (600, 12.5px, 1.35): event text, slots, tags' neighbors, section headings in the tray and attendee panel.
 - **Caption** (700, 11.5px): tags, card bands, hour labels.
-- One-off sizes, kept local: track values (800, 26px; 20px on a phone), card names (800, 18px; 15px on a phone), card effects (700, 14px).
+- One-off sizes, kept local: track values (800, 26px; 20px on a phone), card names (800, 18px; 15px on a phone), card effects (700, 14px), the brand name in the top bar (800, 16px), and the lobby's hero: its headline (800, 44px, 1.05, −0.03em; 32px on a phone) and lead (16px, `fg-muted`, 60ch).
 
 ### Named Rules
 
-**The Calendar Density Rule.** Headings are small and separated by weight, not size, as calendar software does. The display size belongs to the end invite alone.
+**The Calendar Density Rule.** Headings are small and separated by weight, not size, as calendar software does. The display size belongs to the invites; only the lobby's hero headline is larger, since it's the one page that has to sell the game.
 
 ## Layout
 
@@ -238,6 +238,14 @@ Breakpoint: `desk:` is 1280px and up; `max-desk:` is the phone day view below 12
 
 **Attendees:** a seat-colored initial, name, "(you)", host and cards in hand, and state tags for the phase. Built to hold 10 rows.
 
+**Outside the game.** These pages center one raised panel (`raised`, a `line` border, `rounded-dialog`, `shadow-dialog`) under a top bar, in a `minmax(0,1fr)` grid column so a fixed-width panel never widens the page. They switch at `md:` (768px), not `desk:`, since they have no week to fit.
+
+- **Lobby (`/`):** a top bar with the brand only; the hero headline "Your release ships in four sprints. / One of you would rather it didn’t." and its lead; then one panel split into "New team calendar" (name, Create room, primary with the calendar icon) and "Join with a code" (code, name, Join room, secondary), side by side from `md:` with a `line` between, stacked below. The code input is uppercase, 800, tracked 0.3em.
+- **Waiting room** (`app-waiting-room`, the room's lobby phase): a 640px meeting invite. A `brand-fill` band "Meeting invite · Sprint 1 kickoff"; the title "Release: Q3 Platform Excellence"; "Organizer Ana (you) · join with code ETNQ" and "4 sprints · 5–7 attendees · one of you works for management"; one row per player with "(you, host)" / "(you)" / "(host)" and an "Accepted" tag; below the minimum, a "Waiting for at least n more. Share the code." row (outside the attendee list) with a plus in a `neutral-bg` circle. The host's footer has "Start sprint 1", disabled below the minimum with "Needs 5 to start." beside it as its description; everyone else's reads "Waiting for the host to start the game."
+- **Join refusal:** "Join this room" in a 430px panel styled like a half of the lobby's, with the join form minus the code.
+- **Invalid code:** "This isn't a room code." with a "Back to the lobby" link button, in the same panel.
+- **Loading:** "Loading the room…" in `fg-muted`, centered.
+
 Spacing is tight inside a group (4–8px) and separated by lines rather than gaps between groups: calendars are dense.
 
 ## Elevation & Depth
@@ -249,7 +257,7 @@ The calendar is flat: depth comes from tonal surfaces (`chrome` < `sunken` < `gr
 - **Card** (`shadow-card`: `inset 0 1px 0 rgb(255 255 255 / .6), 0 8px 18px rgb(0 0 0 / .45), 0 2px 4px rgb(0 0 0 / .3)`): a playing card resting on the table.
 - **Card lifted** (`0 0 0 3px var(--brand)` plus `shadow-card-lifted`): the selected card, raised 14px (6px on a phone).
 - **Tray** (`shadow-tray`: `0 -10px 24px rgb(0 0 0 / .45)`): the sticky bottom sheet on a phone.
-- **Dialog** (`shadow-dialog`): the end invite, over a blurred scrim (`--scrim`, `backdrop-blur 3px`).
+- **Dialog** (`shadow-dialog`): the end invite, over a blurred scrim (`--scrim`, `backdrop-blur 3px`); also the panels outside the game, which float on the page the same way.
 
 ## Shapes
 
@@ -265,7 +273,7 @@ All in `src/ui` unless noted; each merges a `class` input with `cn`.
 - **Input** (`foldInput`): `sunken`, 40px, 16px semibold text, `control-line` border, brand border and ring on focus.
 - **Field** parts: label in `label`, descriptions in `fg-muted`, errors in `bad` with the circle-alert icon.
 - **Tag** (`foldTag`): a round caption pill; tones `neutral`, `ok`, `warn`, `bad`. Text carries the meaning.
-- **Icons**: the `@lucide/angular` components, one per icon (`<svg lucideLock class="size-4 shrink-0">`): lock, check, copy, triangle-alert, circle-alert, calendar, clock; slice 4 adds bell for the Reminder. 16px, 2px stroke, `currentColor`, and hidden from assistive technology when they have no `title`, so the text beside them carries the meaning. Inside a button or tag, the parent sizes them.
+- **Icons**: the `@lucide/angular` components, one per icon (`<svg lucideLock class="size-4 shrink-0">`): lock, check, copy, triangle-alert, circle-alert, calendar, clock, plus (the waiting room's open seat); slice 4 adds bell for the Reminder. 16px, 2px stroke, `currentColor`, and hidden from assistive technology when they have no `title`, so the text beside them carries the meaning. Inside a button or tag, the parent sizes them.
 - **Card** (`fold-card`): the playing card. Anatomy, top to bottom: a type band in the card's hue with its kind ("Testing") and "Contribution" (hidden on a phone); the name (800, 18px); the effect (700, 14px, the hue mixed into ink); the italic flavor line pushed to the bottom (hidden on a phone); a footer tag ("Counts as Testing"). 176×214px, 138×176px on a phone. `selected` lifts it; `nameId` names a control by the card's name alone.
 - **Calendar event** (`appCalendarEvent`, in the room route): the event block, toned per card type or demand, with `dim`.
 - **Seat avatar** (room route): a light seat color (`--seat-0` to `--seat-9`) with a dark initial; decorative, since the name is always beside it.

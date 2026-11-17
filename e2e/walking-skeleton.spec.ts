@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { newPlayerContext } from './access';
 import {
   attendees,
+  expectNothingClipped,
   fillWhenReady,
   players,
   publicPlayerKeys,
@@ -9,6 +10,7 @@ import {
   showDay,
   stringsIn,
   viewKeys,
+  waitingRoom,
 } from './room-page';
 
 const names = ['Ana', 'Ben', 'Chloe', 'Dimitri', 'Eleni'];
@@ -45,7 +47,11 @@ test('five isolated players create, join and start a game, each seeing only thei
 
     // Ana creates the room.
     await host.goto('/');
-    const create = await fillWhenReady(host, 'Create a room', { 'Your name': names[0] });
+    await expect(host.getByRole('heading', { level: 1 })).toHaveText(
+      'Your release ships in four sprints. One of you would rather it didn’t.',
+    );
+    await expectNothingClipped(host);
+    const create = await fillWhenReady(host, 'New team calendar', { 'Your name': names[0] });
     const created = host.waitForResponse('**/_rpc/lobby/createRoom');
     await create.getByRole('button', { name: 'Create room' }).click();
     const setCookie = (await (await created).allHeaders())['set-cookie'];
@@ -56,13 +62,23 @@ test('five isolated players create, join and start a game, each seeing only thei
     await expect(host).toHaveURL(/\/rooms\/[A-Z]{4}$/);
     const code = new URL(host.url()).pathname.split('/').at(-1)!;
     await expect(host.getByRole('heading', { level: 1 })).toHaveText(`Team calendar ${code}`);
-    await expect(players(host)).toHaveText([/^Ana \(host\) \(you\)$/]);
+    await expect(players(host)).toHaveText([/^\s*A\s*Ana \(you, host\)\s*Accepted\s*$/]);
+    await expect(waitingRoom(host)).toContainText(`Organizer Ana (you) · join with code ${code}`);
+    await expect(waitingRoom(host)).toContainText(
+      '4 sprints · 5–7 attendees · one of you works for management',
+    );
+
+    // Below five players the host can't start, and the invite says how many more it needs.
+    await expect(waitingRoom(host)).toContainText('Waiting for at least 4 more. Share the code.');
+    await expect(host.getByText('Needs 5 to start.')).toBeVisible();
+    await expect(host.getByRole('button', { name: 'Start sprint 1' })).toBeDisabled();
+    await expectNothingClipped(host);
 
     // Four more players join by code, typed in lower case; everyone already in sees each arrival.
     for (let index = 0; index < guests.length; index++) {
       const guest = guests[index];
       await guest.goto('/');
-      const join = await fillWhenReady(guest, 'Join a room', {
+      const join = await fillWhenReady(guest, 'Join with a code', {
         'Room code': code.toLowerCase(),
         'Your name': names[index + 1],
       });
@@ -73,6 +89,16 @@ test('five isolated players create, join and start a game, each seeing only thei
 
       const seated = pages.slice(0, index + 2);
       await Promise.all(seated.map((page) => expect(players(page)).toHaveCount(index + 2)));
+      const missing = names.length - (index + 2);
+      if (missing > 0) {
+        await Promise.all(
+          seated.map((page) =>
+            expect(waitingRoom(page)).toContainText(
+              `Waiting for at least ${missing} more. Share the code.`,
+            ),
+          ),
+        );
+      }
       test.info().annotations.push({
         type: 'timing',
         description: `join ${index + 2}: click to all ${seated.length} pages ${Math.round(performance.now() - clicked)} ms`,
@@ -82,12 +108,16 @@ test('five isolated players create, join and start a game, each seeing only thei
     for (const page of pages) {
       await expect(players(page)).toContainText(names);
       await expect(page.getByRole('status')).toHaveText('Live');
-      await expect(page.getByText('5/7')).toBeVisible();
+      await expect(waitingRoom(page).getByText(/^Waiting for at least/)).toHaveCount(0);
     }
     for (const guest of guests) {
+      await expect(waitingRoom(guest)).toContainText(`Organizer Ana · join with code ${code}`);
       await expect(guest.getByText('Waiting for the host to start the game.')).toBeVisible();
-      await expect(guest.getByRole('button', { name: 'Start the game' })).toHaveCount(0);
+      await expect(guest.getByRole('button', { name: 'Start sprint 1' })).toHaveCount(0);
     }
+    await expect(host.getByText('Needs 5 to start.')).toHaveCount(0);
+    await expectNothingClipped(host);
+    await expectNothingClipped(guests[0]);
 
     // The server refuses a guest's start, even though the page never offers it.
     const refused = await contexts[1].request.post('/_rpc/room/startGame', {
@@ -97,11 +127,11 @@ test('five isolated players create, join and start a game, each seeing only thei
     expect(refused.status()).toBe(403);
     expect((await refused.json()).error.code).toBe('NOT_HOST');
     await expect(players(host)).toHaveCount(5);
-    await expect(host.getByRole('button', { name: 'Start the game' })).toBeEnabled();
+    await expect(host.getByRole('button', { name: 'Start sprint 1' })).toBeEnabled();
 
     // Ana starts; every page moves to sprint 1's booking with its own role and hand.
     const started = performance.now();
-    await host.getByRole('button', { name: 'Start the game' }).click();
+    await host.getByRole('button', { name: 'Start sprint 1' }).click();
     await Promise.all(
       pages.map(async (page) => {
         await expect(
@@ -192,7 +222,7 @@ test('a browser without a seat gets a join form on the room page, and nothing el
   try {
     const ownerPage = await owner.newPage();
     await ownerPage.goto('/');
-    const create = await fillWhenReady(ownerPage, 'Create a room', { 'Your name': 'Ana' });
+    const create = await fillWhenReady(ownerPage, 'New team calendar', { 'Your name': 'Ana' });
     await create.getByRole('button', { name: 'Create room' }).click();
     await expect(ownerPage).toHaveURL(/\/rooms\/[A-Z]{4}$/);
     const roomPath = new URL(ownerPage.url()).pathname;
@@ -202,13 +232,17 @@ test('a browser without a seat gets a join form on the room page, and nothing el
     const join = page.getByRole('region', { name: 'Join this room' });
     await expect(join).toBeVisible();
     await expect(page.getByRole('status')).toHaveText('Not in this room');
-    await expect(page.getByRole('region', { name: 'Players' })).toHaveCount(0);
+    await expect(waitingRoom(page)).toHaveCount(0);
     await expect(join.getByLabel('Room code')).toHaveCount(0);
+    await expectNothingClipped(page);
 
     // Joining from the room page seats the outsider and opens the room.
     await join.getByLabel('Your name').fill('Ben');
     await join.getByRole('button', { name: 'Join room' }).click();
-    await expect(players(page)).toHaveText([/^Ana \(host\)$/, /^Ben \(you\)$/]);
+    await expect(players(page)).toHaveText([
+      /^\s*A\s*Ana \(host\)\s*Accepted\s*$/,
+      /^\s*B\s*Ben \(you\)\s*Accepted\s*$/,
+    ]);
     await expect(players(ownerPage)).toHaveCount(2);
 
     // A refused join sets no cookie: the session cookie follows an accepted seat only. Codes never
@@ -222,5 +256,27 @@ test('a browser without a seat gets a join form on the room page, and nothing el
     expect(missing.headers()['set-cookie']).toBeUndefined();
   } finally {
     await Promise.all([owner.close(), outsider.close()]);
+  }
+});
+
+test('a room path that is not a room code says so, with a way back', async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await newPlayerContext(browser, baseURL);
+
+  try {
+    const page = await context.newPage();
+    await page.goto('/rooms/ab1');
+    await expect(page.getByRole('heading', { name: "This isn't a room code." })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Not a room code');
+    await expect(page.getByRole('button', { name: 'Reconnect' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Back to the lobby' })).toHaveAttribute(
+      'href',
+      '/',
+    );
+    await expectNothingClipped(page);
+  } finally {
+    await context.close();
   }
 });

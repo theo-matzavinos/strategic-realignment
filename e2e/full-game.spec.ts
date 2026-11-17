@@ -140,15 +140,18 @@ async function openGame(
   const [host, ...guests] = pages;
 
   await host.goto('/');
-  const create = await fillWhenReady(host, 'Create a room', { 'Your name': names[0] });
+  await expectNothingClipped(host);
+  const create = await fillWhenReady(host, 'New team calendar', { 'Your name': names[0] });
   await create.getByRole('button', { name: 'Create room' }).click();
   await expect(host).toHaveURL(/\/rooms\/[A-Z]{4}$/);
   const code = new URL(host.url()).pathname.split('/').at(-1)!;
+  await expect(players(host)).toHaveCount(1);
+  await expectNothingClipped(host);
 
   for (let index = 0; index < guests.length; index++) {
     const guest = guests[index];
     await guest.goto('/');
-    const join = await fillWhenReady(guest, 'Join a room', {
+    const join = await fillWhenReady(guest, 'Join with a code', {
       'Room code': code,
       'Your name': names[index + 1],
     });
@@ -157,8 +160,9 @@ async function openGame(
     await expect(players(guest)).toHaveCount(index + 2);
   }
   await Promise.all(pages.map((page) => expect(players(page)).toHaveCount(names.length)));
+  await expectNothingClipped(guests.at(-1)!);
 
-  await host.getByRole('button', { name: 'Start the game' }).click();
+  await host.getByRole('button', { name: 'Start sprint 1' }).click();
   await Promise.all(pages.map((page) => expect(attendees(page)).toHaveCount(names.length)));
 
   const sessionIds: string[] = [];

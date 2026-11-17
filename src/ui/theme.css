@@ -130,19 +130,6 @@
   --color-paper-line: var(--paper-line);
   --color-scrim: var(--scrim);
 
-  /*
-   * The names the lobby page still uses until slice 3 moves it onto the tokens above. They point at
-   * the new palette, so nothing renders in the old one.
-   */
-  --color-background: var(--ground);
-  --color-foreground: var(--fg);
-  --color-surface: var(--raised);
-  --color-border: var(--line);
-  --color-muted-foreground: var(--fg-muted);
-  --color-destructive-text: var(--bad);
-  --color-success: var(--ok);
-  --color-warning: var(--warn);
-
   /* Derived tints: mixed from the tokens, never stored. */
   /* Hover and press go darker: lighter than `brand-fill` drops white text under 4.5:1. */
   --color-brand-hover: color-mix(in oklab, var(--brand-fill), #000 8%);

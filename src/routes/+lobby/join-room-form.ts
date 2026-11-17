@@ -14,13 +14,13 @@ import { injectRpc } from './rpc.generated';
   selector: 'app-join-room-form',
   imports: [Button, Field, FieldError, FieldLabel, FormField, Input],
   template: `
-    <form class="flex flex-col gap-4" novalidate (submit)="join($event)">
+    <form class="flex flex-col gap-3.5" novalidate (submit)="join($event)">
       @if (code() === undefined) {
         <div foldField #codeField="foldField">
           <label foldFieldLabel>Room code</label>
           <input
             foldInput
-            class="uppercase tracking-widest"
+            class="font-extrabold tracking-[0.3em] uppercase"
             autocomplete="off"
             autocapitalize="characters"
             spellcheck="false"
@@ -41,12 +41,12 @@ import { injectRpc } from './rpc.generated';
       </div>
 
       @if (error(); as message) {
-        <p role="alert" class="text-destructive-text">{{ message }}</p>
+        <p role="alert" class="text-bad">{{ message }}</p>
       }
 
       <button
         foldButton
-        variant="primary"
+        size="lg"
         type="submit"
         class="self-start"
         [disabled]="!hydrated() || joinForm().submitting()"
