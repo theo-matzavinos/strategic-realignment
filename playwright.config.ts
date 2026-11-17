@@ -42,6 +42,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   workers: 1,
   reporter: [['list']],
-  use: { baseURL, extraHTTPHeaders: accessHeaders() },
+  // The table's moments are off by default, so a step never waits on one; moments.spec.ts turns them on.
+  use: { baseURL, extraHTTPHeaders: accessHeaders(), reducedMotion: 'reduce' },
   webServer,
 });

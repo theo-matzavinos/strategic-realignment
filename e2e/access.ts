@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext } from '@playwright/test';
+import type { Browser, BrowserContext, BrowserContextOptions } from '@playwright/test';
 
 /**
  * The Cloudflare Access service-token headers for a deployed run, or none locally. Every request a
@@ -14,10 +14,14 @@ export function accessHeaders(): Record<string, string> | undefined {
   return { 'CF-Access-Client-Id': id, 'CF-Access-Client-Secret': secret };
 }
 
-/** A fresh, isolated player: its own cookies, and through Access when the run is deployed. */
+/**
+ * A fresh, isolated player: its own cookies, and through Access when the run is deployed. `options`
+ * adds to the config's, such as motion for the moments.
+ */
 export function newPlayerContext(
   browser: Browser,
   baseURL: string | undefined,
+  options: BrowserContextOptions = {},
 ): Promise<BrowserContext> {
-  return browser.newContext({ baseURL, extraHTTPHeaders: accessHeaders() });
+  return browser.newContext({ ...options, baseURL, extraHTTPHeaders: accessHeaders() });
 }

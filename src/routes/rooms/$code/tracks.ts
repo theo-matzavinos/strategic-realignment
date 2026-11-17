@@ -1,7 +1,8 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { Button } from '#ui/button';
 import type { PlayerView } from '../../../game/view';
 import { playerName } from './display-names';
+import { Moments } from './moments';
 
 /** Morale starts at 4 and never rises (docs/rules.md, Components). */
 const moralePips = [1, 2, 3, 4];
@@ -24,10 +25,13 @@ const moralePips = [1, 2, 3, 4];
               {{ board().progress }}
               <small [class]="trackUnit">/ {{ board().target }} target</small>
             </span>
+            <!-- The bar and pips are scaled, not resized, so a change animates without layout. -->
             <span aria-hidden="true" class="h-1.5 overflow-hidden rounded-full bg-line">
               <span
-                class="block h-full rounded-full bg-tests transition-[width] duration-500 motion-reduce:transition-none"
-                [style.width.%]="progressShare()"
+                [class]="fill"
+                class="h-full rounded-full bg-tests"
+                [style.scale]="progressShare() + ' 1'"
+                [style.transition-delay.ms]="fillDelay()"
               ></span>
             </span>
           </dd>
@@ -38,11 +42,14 @@ const moralePips = [1, 2, 3, 4];
             <span [class]="trackValue">{{ board().morale }}</span>
             <span aria-hidden="true" class="flex gap-1">
               @for (pip of moralePips; track pip) {
-                <span
-                  class="h-1.75 w-5 rounded-[2px] max-desk:w-3.5"
-                  [class.bg-workaround]="pip <= board().morale"
-                  [class.bg-line]="pip > board().morale"
-                ></span>
+                <span class="h-1.75 w-5 overflow-hidden rounded-[2px] bg-line max-desk:w-3.5">
+                  <span
+                    [class]="fill"
+                    class="h-full bg-workaround"
+                    [style.scale]="pipScale(pip)"
+                    [style.transition-delay.ms]="fillDelay()"
+                  ></span>
+                </span>
               }
             </span>
           </dd>
@@ -88,12 +95,50 @@ export class Tracks {
   protected readonly trackUnit =
     'text-[15px] font-semibold tracking-normal text-fg-muted max-desk:text-[12px]';
 
-  protected readonly board = computed(() => this.room().board);
-  protected readonly progressShare = computed(() => {
-    const { progress, target } = this.board();
+  readonly #moments = inject(Moments);
+  /**
+   * A changed track fills or drains; on load it's simply there, since a transition only plays on a
+   * change. Off under reduced motion.
+   */
+  protected readonly fill =
+    'block origin-left transition-[scale] duration-700 ease-out-expo motion-reduce:transition-none';
 
-    return Math.min(100, (progress / target) * 100);
+  protected readonly board = computed(() => this.room().board);
+  /**
+   * What the bar and pips show. While a reveal's Reminder is open they keep the sprint before it;
+   * then they move with the meeting notes. The numbers beside them are always the current ones.
+   */
+  readonly #shown = computed(() => {
+    const reveal = this.#moments.reveal();
+    if (this.#moments.revealStage() === 'held' && reveal !== null) {
+      return reveal.from.board;
+    }
+
+    return this.board();
   });
+  /** Only the reveal's own fill waits for the notes; any later change moves at once. */
+  protected readonly fillDelay = computed(() => {
+    const reveal = this.#moments.reveal();
+    const latest = this.#moments.change().seq;
+    if (this.#moments.revealStage() === 'playing' && reveal?.id === latest) {
+      return reveal.notesAt;
+    }
+
+    return 0;
+  });
+  protected readonly progressShare = computed(() => {
+    const { progress, target } = this.#shown();
+
+    return Math.min(1, progress / target);
+  });
+
+  protected pipScale(pip: number): string {
+    if (pip <= this.#shown().morale) {
+      return '1 1';
+    }
+
+    return '0 1';
+  }
 
   protected readonly nowLabel = computed(() => {
     if (this.room().phase === 'ended') {

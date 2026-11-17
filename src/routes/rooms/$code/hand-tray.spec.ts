@@ -5,6 +5,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { viewFor, type PlayerView } from '../../../game/view';
 import { Rooms, type ServerRoom } from '../../../server/rooms';
+import { provideMoments } from './moments';
 import { HandTray } from './hand-tray';
 
 /** Five players in sprint 1, booking; you are the first. */
@@ -21,6 +22,8 @@ function contributeRoom(): { room: ServerRoom; ids: string[] } {
 
 function render(view: PlayerView): ComponentFixture<HandTray> {
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+  // The room table provides the moments in the app; here they follow the component's own input.
+  TestBed.overrideComponent(HandTray, { add: { providers: [provideMoments(HandTray)] } });
   const fixture = TestBed.createComponent(HandTray);
   fixture.componentRef.setInput('room', view);
   fixture.detectChanges();

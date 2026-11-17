@@ -1,10 +1,20 @@
-import { Component, computed, effect, ElementRef, input, model, viewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  inject,
+  input,
+  model,
+  viewChild,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Button, ButtonLink } from '#ui/button';
 import { LucideCalendar, LucideTriangleAlert } from '@lucide/angular';
 import { Tag } from '#ui/tag';
 import type { PlayerView } from '../../../game/view';
 import { roleNames } from './display-names';
+import { Moments } from './moments';
 import { SeatAvatar } from './seat-avatar';
 
 type Result = NonNullable<PlayerView['result']>;
@@ -136,11 +146,34 @@ export class EndInvite {
     return `Progress ${board.progress} of ${board.target} after sprint ${sprint}.`;
   });
 
+  readonly #moments = inject(Moments);
+  /**
+   * Whether the game ended in the view that just arrived, read once as the invite is created: then
+   * it slides up the first time it opens. A page that loads into the end shows it settled.
+   */
+  #slideUp = this.#moments.arrived((from, to) => from.phase !== 'ended' && to.phase === 'ended');
+
   constructor() {
     effect(() => {
       const dialog = this.dialog().nativeElement;
       if (this.open() && !dialog.open) {
         dialog.showModal();
+        if (this.#slideUp) {
+          this.#moments.animate(
+            dialog,
+            [
+              { transform: 'translateY(72px)', opacity: 0.25 },
+              { transform: 'none', opacity: 1 },
+            ],
+            { duration: 560, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+          );
+          this.#moments.animate(dialog, [{ opacity: 0 }, { opacity: 1 }], {
+            duration: 320,
+            easing: 'ease-out',
+            pseudoElement: '::backdrop',
+          });
+        }
+        this.#slideUp = false;
       }
       if (!this.open() && dialog.open) {
         dialog.close();

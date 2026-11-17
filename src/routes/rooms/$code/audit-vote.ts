@@ -1,9 +1,10 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { Button } from '#ui/button';
 import { LucideCheck, LucideClock } from '@lucide/angular';
 import type { PlayerView } from '../../../game/view';
 import { CalendarEvent, eventMeta, eventText } from './calendar-event';
 import { playerName, playerNames } from './display-names';
+import { Moments } from './moments';
 import { RoomRequest } from './room-request';
 import { injectRpc } from './rpc.generated';
 
@@ -21,10 +22,10 @@ type Vote = NonNullable<PlayerView['vote']>;
     <section
       aria-labelledby="vote-heading"
       appCalendarEvent="var(--workaround)"
-      class="flex flex-col gap-1"
+      class="relative flex flex-col gap-1"
     >
       <p [class]="eventMeta"><svg lucideClock class="size-4 shrink-0"></svg> Poll</p>
-      <h3 id="vote-heading" class="text-[16px] leading-tight font-bold wrap-anywhere">
+      <h3 id="vote-heading" class="pe-16 text-[16px] leading-tight font-bold wrap-anywhere">
         Audit {{ nominee() }}?
       </h3>
       <p class="text-label font-normal" [class]="eventText">
@@ -32,6 +33,19 @@ type Vote = NonNullable<PlayerView['vote']>;
       </p>
 
       @if (vote().outcome; as outcome) {
+        <!-- The stamp repeats the outcome line below it, so it's hidden from assistive technology. -->
+        <span
+          aria-hidden="true"
+          class="absolute top-2.5 right-2.5 -rotate-8 rounded-control-sm border-2 px-2 py-0.5 text-caption tracking-[0.12em] uppercase"
+          [class]="stampTone()"
+          [animate.enter]="stamp()"
+        >
+          @if (outcome.passed) {
+            Passed
+          } @else {
+            Failed
+          }
+        </span>
         @if (outcome.passed) {
           <p class="mt-1 text-title">The audit passed.</p>
         } @else {
@@ -102,6 +116,24 @@ export class AuditVote {
 
     return vote;
   });
+  readonly #moments = inject(Moments);
+  /** The stamp lands when the last vote arrives; a page that loads with the outcome shows it settled. */
+  protected readonly stamp = computed(() => {
+    const decided = this.#moments.arrived((from, to) => !isDecided(from) && isDecided(to));
+    if (decided) {
+      return 'motion-safe:animate-stamp';
+    }
+
+    return null;
+  });
+  /** A passed audit marks someone, like the audited tags; a failed one is just over. */
+  protected readonly stampTone = computed(() => {
+    if (this.vote().outcome?.passed) {
+      return 'border-warn text-warn';
+    }
+
+    return 'border-fg-muted text-fg-muted';
+  });
   protected readonly nominee = computed(() => playerName(this.room(), this.vote().nominee));
   /** An audit passes if more than half of all players vote yes. */
   protected readonly threshold = computed(() => Math.floor(this.room().players.length / 2) + 1);
@@ -113,4 +145,8 @@ export class AuditVote {
   protected cast(yes: boolean): void {
     void this.request.send(() => this.#rpc.room.vote({ code: this.room().code, yes }));
   }
+}
+
+function isDecided(view: PlayerView): boolean {
+  return view.vote !== null && view.vote.outcome !== null;
 }

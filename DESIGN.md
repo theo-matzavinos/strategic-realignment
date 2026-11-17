@@ -136,7 +136,7 @@ components:
 
 # Design System: Strategic Realignment
 
-Recorded from what the lobby and the room page ship after the Sprint Calendar redesign (slices 1–3). The approved plan and mock live in the work-evidence folder `sr-sprint-calendar-redesign`; product truth is `PRODUCT.md`. Tokens live once, in `src/ui/theme.css`; Tailwind reads them through `@theme inline`.
+Recorded from what the lobby and the room page ship after the Sprint Calendar redesign (slices 1–4). The approved plan and mock live in the work-evidence folder `sr-sprint-calendar-redesign`; product truth is `PRODUCT.md`. Tokens live once, in `src/ui/theme.css`; Tailwind reads them through `@theme inline`.
 
 ## Overview
 
@@ -207,7 +207,7 @@ Each card type has a hue, used for its band, its tint on calendar events and its
 - **Body** (400, 14px, 1.4): running text.
 - **Label** (600, 12.5px, 1.35): event text, slots, tags' neighbors, section headings in the tray and attendee panel.
 - **Caption** (700, 11.5px): tags, card bands, hour labels.
-- One-off sizes, kept local: track values (800, 26px; 20px on a phone), card names (800, 18px; 15px on a phone), card effects (700, 14px), the brand name in the top bar (800, 16px), and the lobby's hero: its headline (800, 44px, 1.05, −0.03em; 32px on a phone) and lead (16px, `fg-muted`, 60ch).
+- One-off sizes, kept local: track values (800, 26px; 20px on a phone), card names (800, 18px; 15px on a phone), card effects (700, 14px), the brand name in the top bar (800, 16px), and the lobby's hero: its headline (800, 44px, 1.05, −0.03em; 32px on a phone) and lead (16px, `fg-muted`, 60ch), the Reminder's title (800, 26px; 22px on a phone) and the poll's stamp (caption, uppercase, tracked 0.12em).
 
 ### Named Rules
 
@@ -257,7 +257,7 @@ The calendar is flat: depth comes from tonal surfaces (`chrome` < `sunken` < `gr
 - **Card** (`shadow-card`: `inset 0 1px 0 rgb(255 255 255 / .6), 0 8px 18px rgb(0 0 0 / .45), 0 2px 4px rgb(0 0 0 / .3)`): a playing card resting on the table.
 - **Card lifted** (`0 0 0 3px var(--brand)` plus `shadow-card-lifted`): the selected card, raised 14px (6px on a phone).
 - **Tray** (`shadow-tray`: `0 -10px 24px rgb(0 0 0 / .45)`): the sticky bottom sheet on a phone.
-- **Dialog** (`shadow-dialog`): the end invite, over a blurred scrim (`--scrim`, `backdrop-blur 3px`); also the panels outside the game, which float on the page the same way.
+- **Dialog** (`shadow-dialog`): the end invite and the Reminder, over a blurred scrim (`--scrim`, `backdrop-blur 3px`); also the panels outside the game, which float on the page the same way.
 
 ## Shapes
 
@@ -273,7 +273,7 @@ All in `src/ui` unless noted; each merges a `class` input with `cn`.
 - **Input** (`foldInput`): `sunken`, 40px, 16px semibold text, `control-line` border, brand border and ring on focus.
 - **Field** parts: label in `label`, descriptions in `fg-muted`, errors in `bad` with the circle-alert icon.
 - **Tag** (`foldTag`): a round caption pill; tones `neutral`, `ok`, `warn`, `bad`. Text carries the meaning.
-- **Icons**: the `@lucide/angular` components, one per icon (`<svg lucideLock class="size-4 shrink-0">`): lock, check, copy, triangle-alert, circle-alert, calendar, clock, plus (the waiting room's open seat); slice 4 adds bell for the Reminder. 16px, 2px stroke, `currentColor`, and hidden from assistive technology when they have no `title`, so the text beside them carries the meaning. Inside a button or tag, the parent sizes them.
+- **Icons**: the `@lucide/angular` components, one per icon (`<svg lucideLock class="size-4 shrink-0">`): lock, check, copy, triangle-alert, circle-alert, calendar, clock, plus (the waiting room's open seat), and bell for the Reminder. 16px, 2px stroke, `currentColor`, and hidden from assistive technology when they have no `title`, so the text beside them carries the meaning. Inside a button or tag, the parent sizes them.
 - **Card** (`fold-card`): the playing card. Anatomy, top to bottom: a type band in the card's hue with its kind ("Testing") and "Contribution" (hidden on a phone); the name (800, 18px); the effect (700, 14px, the hue mixed into ink); the italic flavor line pushed to the bottom (hidden on a phone); a footer tag ("Counts as Testing"). 176×214px, 138×176px on a phone. `selected` lifts it; `nameId` names a control by the card's name alone.
 - **Calendar event** (`appCalendarEvent`, in the room route): the event block, toned per card type or demand, with `dim`.
 - **Seat avatar** (room route): a light seat color (`--seat-0` to `--seat-9`) with a dark initial; decorative, since the name is always beside it.
@@ -286,17 +286,25 @@ The voice is deadpan corporate: "Required · from Leadership", "A booked card is
 
 ## Motion
 
-Slices 1–2 ship only state transitions: hover and selection lift on cards (250ms, `cubic-bezier(.2,.8,.2,1)`), button presses, the Progress bar width and the dim fade. All are off under `prefers-reduced-motion`.
+One authored moment per big event, each an exponential ease-out (`ease-out-expo`, `cubic-bezier(0.16, 1, 0.3, 1)`) from an already-visible resting state, moving only transform, opacity and `scale`. The one deliberate exception is the meeting notes' count-up, which interpolates a registered integer (`--count`) behind a CSS counter: it repaints one short number for 640ms, which the approved plan asks for and a 4×-throttled phone capture showed costs nothing measurable. Small state changes keep their short transitions: card hover and selection (250ms), button presses, the dim fade.
 
-The moments for slice 4, built on what's here: the per-phase lanes are stable elements, and the Sprint Review rows render from `lastReveal.cards` in order, so a turn-over can stagger them without knowing whose they are.
+**Where it lives.** `Moments` (`src/routes/rooms/$code/moments.ts`), provided once by the room table, derives every moment from two successive views the page received (`linkedSignal` over the room input). Its first view has no predecessor, so a load or reload renders the settled state and replays nothing. The keyframes are `--animate-*` tokens in `src/ui/theme.css`, used with `motion-safe:`; the few script moves (the booking flight, the column re-flow, the week slide, the shake, the invite) go through `Moments.animate`, which plays nothing under reduced motion. Each move belongs to the phase and sprint it started in: it stops, leaving its element at rest, as soon as the table moves to another phase or sprint (the next sprint, or the result), and when the table goes. The open Reminder and a held reveal end the same way, so nothing from one sprint plays over the next or over the result.
 
-- **Booking:** the card lifts, then moves into "Your slot"; others see a Busy block settle in.
-- **Contribute → retro:** a Reminder ("Now · Thursday · Sprint Review · n contributions, shuffled. Turning them over…") for about 2.5s with a countdown, closing by itself, on Dismiss, scrim click or Esc; it never steals focus mid-action and never blocks input once closed. Then the columns re-flow to Thursday, the rows turn over about 180ms apart in `lastReveal.cards` order only, the notes count up and the Progress bar fills; an incident shakes the grid briefly.
-- **Vote outcome:** a passed/failed stamp on the poll; a Morale pip drains if it passed.
-- **Retro → next sprint:** the week slides to the next; a Reminder announces the new demand.
-- **End:** the invite slides up.
-- **Reduced motion:** no flips, slides or shakes; the Reminder becomes a static banner without a scrim; state appears at once.
-- Animations play only on a view change the client receives. A reload renders the settled state.
+1. **Booking.** Your picked card is already lifted. When your booking lands, a copy of it flies from the hand into "Your slot", shrinking to the slot's width and fading as the slot fades in (620ms). Only on your screen, and only when this page sent the booking. Everyone else's new Busy block settles in (380ms, from 8px above at 104%), which is public: who has booked is.
+2. **Contribute → retro.**
+   1. A Reminder: "Now · Thursday" · "Sprint Review" · "n contributions, shuffled. Turning them over…", with a 2.5s countdown bar.
+   2. While it's open the reveal is held: the rows are in the DOM, face down (their turn animation paused), the week keeps Tue–Wed's columns, and the Progress bar and Morale pips keep the sprint before.
+   3. When it closes, the days slide to Thursday's columns (360ms, position only), then the rows turn over one every 180ms (`rotateX` 520ms), in `lastReveal.cards` order: a row's delay is its index in the payload and nothing else. The audited card follows, then the removed one.
+   4. Then the meeting notes rise in and their Progress counts up from 0 (a CSS counter on a registered `--count`; the real number is in the DOM for assistive technology), the Progress bar fills and a lost Morale pip drains (700ms), and an incident shakes the week (460ms).
+3. **Vote outcome.** A "Passed" (warn) or "Failed" (muted) stamp lands on the poll (420ms, from 160%), when the last vote arrives. It stays as part of the settled poll; it repeats the outcome line, so it's hidden from assistive technology. A passed audit drains a Morale pip.
+4. **Retro → next sprint.** The week slides in from the right (520ms), and a Reminder announces the demand: "Now · Monday · Sprint n", its name, its requirement and penalty.
+5. **End.** The all-hands invite slides up over a fading backdrop (560ms), the first time it opens after the game ended on this page. "Show result" reopens it without motion.
+
+**The Reminder** is non-modal on purpose. It never takes focus and never blocks input: its scrim and its card let presses through, and only Dismiss takes one. Any press anywhere or Esc closes it, and a press over the scrim or the card still reaches the control under it, in one tap. It closes by itself after 2.5s, or on Dismiss. It sits first in the table's DOM, so a keyboard reaches Dismiss right after the top bar, never mid-action; if focus is on Dismiss when it closes, focus goes back to where it came from. When reduced motion turns on while the card shows, the card becomes the banner and focus on its Dismiss moves to the banner's Dismiss. It's announced through a polite live region. The card is the mock's: a `chrome` header with the bell, "Now · …" in `brand-text`, the title at a one-off 26px (22px on a phone), the countdown in `brand`, and a footer "Closes by itself" with Dismiss.
+
+**Reduced motion** (`prefers-reduced-motion: reduce`): nothing flips, slides, flies or shakes, and nothing is held: the state appears at once. The Reminder is a static banner under the top bar, without a scrim or countdown, and still closes by itself, on Dismiss, a press or Esc. The preference can change mid-game: turning reduction on stops every running or delayed move and lets go of a held reveal at once, and the open Reminder becomes the banner without a slide. Turning it off moves only later moments: a reveal or Reminder that arrived or was showing under reduction stays settled, and an entrance it cut short doesn't start over.
+
+**Hidden information.** No moment's order, timing or origin may follow a seat, slot or attendee: the rows turn in payload order, the Busy settle follows public booking state, and the booking flight shows only on the booker's own screen.
 
 ## Do's and Don'ts
 

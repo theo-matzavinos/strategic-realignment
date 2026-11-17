@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import type { CardType } from '../../../game/cards';
 import type { PlayerView } from '../../../game/view';
+import { provideMoments } from './moments';
 import { SprintReview } from './sprint-review';
 
 type Reveal = NonNullable<PlayerView['lastReveal']>;
@@ -59,6 +60,13 @@ function rows(element: HTMLElement): string[] {
 }
 
 describe('SprintReview', () => {
+  // The room table provides the moments in the app; here they follow the component's own input.
+  beforeEach(() => {
+    TestBed.overrideComponent(SprintReview, {
+      add: { providers: [provideMoments(SprintReview)] },
+    });
+  });
+
   it('renders one row per card in lastReveal.cards order, yours marked, the audited card last and attributed, and the removed card as one row', () => {
     const element = render(
       retroView({

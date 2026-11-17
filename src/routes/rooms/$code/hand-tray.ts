@@ -1,4 +1,4 @@
-import { Component, computed, input, linkedSignal } from '@angular/core';
+import { Component, computed, ElementRef, inject, input, linkedSignal } from '@angular/core';
 import { Button } from '#ui/button';
 import { Card } from '#ui/card';
 import { LucideCalendar, LucideLock } from '@lucide/angular';
@@ -13,6 +13,7 @@ import {
   playerNames,
   roleNames,
 } from './display-names';
+import { Moments } from './moments';
 import { RoomRequest } from './room-request';
 import { injectRpc } from './rpc.generated';
 
@@ -164,6 +165,8 @@ export class HandTray {
   readonly room = input.required<PlayerView>();
 
   readonly #rpc = injectRpc();
+  readonly #host = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #moments = inject(Moments);
   protected readonly request = new RoomRequest(this.room);
   protected readonly roleNames = roleNames;
   protected readonly cardNames = cardNames;
@@ -241,6 +244,17 @@ export class HandTray {
     const card = this.selectedCard();
     if (card === null) {
       return;
+    }
+
+    // Where the card leaves your hand from, so your slot can show it arriving once the booking lands.
+    const face = this.#host.nativeElement.querySelector<HTMLElement>(
+      '[data-slot="card"][data-selected]',
+    );
+    if (face !== null) {
+      this.#moments.bookedFrom = {
+        card: face.cloneNode(true) as HTMLElement,
+        rect: face.getBoundingClientRect(),
+      };
     }
 
     void this.request.send(() => this.#rpc.room.contribute({ code: this.room().code, card }));

@@ -3,17 +3,23 @@ import type { PlayerView } from '../../../game/view';
 import { Attendees } from './attendees';
 import { EndInvite } from './end-invite';
 import { HandTray } from './hand-tray';
+import { provideMoments } from './moments';
+import { Reminder } from './reminder';
 import { Tracks } from './tracks';
 import { Week } from './week';
 
 /**
  * The game table: the board tracks, the sprint's week beside its attendees, and your hand tray along
- * the bottom, sticky at phone width. After the game, the result as an invite over it.
+ * the bottom, sticky at phone width. After the game, the result as an invite over it. Its parts share
+ * one `Moments`, so the big events play as one sequence.
  */
 @Component({
   selector: 'app-room-table',
-  imports: [Attendees, EndInvite, HandTray, Tracks, Week],
+  imports: [Attendees, EndInvite, HandTray, Reminder, Tracks, Week],
+  providers: [provideMoments(RoomTable)],
   template: `
+    <!-- First, so a keyboard reaches its Dismiss right after the top bar, never mid-action. -->
+    <app-reminder />
     <app-tracks [room]="room()" (showResult)="inviteOpen.set(true)" />
     <div class="grid flex-1 desk:grid-cols-[minmax(0,1fr)_280px]">
       <app-week [room]="room()" />

@@ -172,6 +172,88 @@
   --shadow-card-lifted: 0 16px 26px rgb(0 0 0 / 0.5), 0 3px 6px rgb(0 0 0 / 0.3);
   --shadow-tray: 0 -10px 24px rgb(0 0 0 / 0.45);
   --shadow-dialog: 0 30px 80px rgb(0 0 0 / 0.65), 0 4px 12px rgb(0 0 0 / 0.3);
+
+  /*
+   * Motion: one exponential ease-out for every moment, transform and opacity only, with one
+   * deliberate exception: `--animate-count` interpolates the integer `--count` behind a CSS counter,
+   * repainting one short number. Each moment is used with `motion-safe:`, so under reduced motion the
+   * state simply appears.
+   */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A booked slot settling into the week: on everyone's screen, since who booked is public. */
+  --animate-settle: settle 380ms var(--ease-out-expo) both;
+  /* A Sprint Review row turning over, after `--turn-delay`. */
+  --animate-turn: turn 520ms var(--ease-out-expo) var(--turn-delay, 0ms) both;
+  /* The meeting notes arriving under the rows, after `--notes-at`. */
+  --animate-notes: notes 360ms var(--ease-out-expo) var(--notes-at, 0ms) both;
+  /* The notes' Progress counting up from 0 to its `--count`, after `--notes-at`. */
+  --animate-count: count 640ms var(--ease-out-expo) var(--notes-at, 0ms) both;
+  /* The poll's passed/failed stamp landing. */
+  --animate-stamp: stamp 420ms var(--ease-out-expo) both;
+  /* The Reminder arriving, and its countdown. */
+  --animate-reminder: reminder 320ms var(--ease-out-expo) both;
+  --animate-reminder-out: reminder-out 160ms ease-in both;
+  --animate-scrim: scrim 240ms ease-out both;
+  --animate-countdown: countdown 2500ms linear both;
+
+  @keyframes settle {
+    from {
+      opacity: 0.3;
+      transform: translateY(-8px) scale(1.04);
+    }
+  }
+  @keyframes turn {
+    from {
+      opacity: 0;
+      transform: perspective(600px) rotateX(-88deg);
+    }
+  }
+  @keyframes notes {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @keyframes count {
+    from {
+      --count: 0;
+    }
+  }
+  @keyframes stamp {
+    from {
+      opacity: 0;
+      scale: 1.6;
+    }
+  }
+  @keyframes reminder {
+    from {
+      opacity: 0;
+      transform: translateY(14px) scale(0.97);
+    }
+  }
+  @keyframes reminder-out {
+    to {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+  }
+  @keyframes scrim {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes countdown {
+    to {
+      transform: scaleX(0);
+    }
+  }
+}
+
+/* An integer, so the meeting notes' Progress can count up: `--animate-count` interpolates it. */
+@property --count {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
 }
 
 @layer base {

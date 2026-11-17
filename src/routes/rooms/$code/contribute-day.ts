@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { type AnimationCallbackEvent, Component, computed, inject, input } from '@angular/core';
 import { cn } from '#ui/cn';
 import { LucideCalendar, LucideLock } from '@lucide/angular';
 import type { PlayerId } from '../../../game/game';
@@ -6,6 +6,7 @@ import type { PlayerView } from '../../../game/view';
 import { CalendarEvent, eventMeta } from './calendar-event';
 import { cardTones } from './card-tones';
 import { cardEffects, cardNames } from './display-names';
+import { Moments } from './moments';
 
 type Slot =
   | { kind: 'mine'; playerId: PlayerId; audited: boolean }
@@ -27,7 +28,11 @@ type Slot =
           @switch (slot.kind) {
             @case ('mine') {
               @if (room().me.contribution; as card) {
-                <li [appCalendarEvent]="cardTones[card]" class="min-h-13 ring-2 ring-brand">
+                <li
+                  [appCalendarEvent]="cardTones[card]"
+                  class="min-h-13 ring-2 ring-brand"
+                  (animate.enter)="arrive($event)"
+                >
                   <p [class]="eventMeta">
                     <svg lucideCalendar class="size-4 shrink-0"></svg>
                     Your slot
@@ -51,14 +56,14 @@ type Slot =
               }
             }
             @case ('busy') {
-              <li [class]="busySlot">
+              <li [class]="busySlot" [animate.enter]="settle(slot.playerId)">
                 <svg lucideLock class="size-4 shrink-0"></svg>
                 Busy · private
               </li>
             }
             @case ('audited') {
               @if (slot.booked) {
-                <li [class]="busySlot">
+                <li [class]="busySlot" [animate.enter]="settle(slot.playerId)">
                   <svg lucideLock class="size-4 shrink-0"></svg>
                   {{ slot.name }} · audited, booked face up
                 </li>
@@ -102,6 +107,104 @@ export class ContributeDay {
     this.openSlot,
     'border-brand bg-brand-tint font-semibold text-brand-text',
   );
+
+  readonly #moments = inject(Moments);
+
+  /** Who booked in the view that just arrived: their slot settles in as Busy, on every screen. */
+  readonly #justBooked = computed(() => {
+    const { from, to } = this.#moments.change();
+    const booked = new Set<PlayerId>();
+    if (from === null || from.phase !== 'contribute' || from.sprint !== to.sprint) {
+      return booked;
+    }
+
+    const before = new Set<PlayerId>();
+    for (const player of from.players) {
+      if (player.hasContributed) {
+        before.add(player.playerId);
+      }
+    }
+    for (const player of to.players) {
+      if (player.hasContributed && !before.has(player.playerId)) {
+        booked.add(player.playerId);
+      }
+    }
+
+    return booked;
+  });
+
+  protected settle(playerId: PlayerId): string | null {
+    if (this.#justBooked().has(playerId)) {
+      return 'motion-safe:animate-settle';
+    }
+
+    return null;
+  }
+
+  /**
+   * Your slot as your booking lands: the card you booked flies from your hand into it, shrinking,
+   * and the slot fades in under it. Only on your screen, and only when this page sent the booking.
+   */
+  protected arrive({ target, animationComplete }: AnimationCallbackEvent): void {
+    const from = this.#moments.bookedFrom;
+    this.#moments.bookedFrom = null;
+    animationComplete();
+    if (from === null || !(target instanceof HTMLElement)) {
+      return;
+    }
+
+    // At phone width the slot shows only on the Tue–Wed tab.
+    const slot = target.getBoundingClientRect();
+    if (!target.checkVisibility() || slot.width === 0) {
+      return;
+    }
+
+    const ghost = from.card;
+    const scale = slot.width / from.rect.width;
+    const dx = slot.left - from.rect.left;
+    const dy = slot.top - from.rect.top;
+    const flight = this.#moments.animate(
+      ghost,
+      [
+        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+        { transform: 'translate(0, -10px) scale(1.03)', opacity: 1, offset: 0.18 },
+        { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 1, offset: 0.8 },
+        { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0 },
+      ],
+      { duration: 620, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+    );
+    // Under reduced motion nothing flies.
+    if (flight === null) {
+      return;
+    }
+
+    ghost.setAttribute('aria-hidden', 'true');
+    for (const named of ghost.querySelectorAll('[id]')) {
+      named.removeAttribute('id');
+    }
+    Object.assign(ghost.style, {
+      position: 'fixed',
+      left: `${from.rect.left}px`,
+      top: `${from.rect.top}px`,
+      width: `${from.rect.width}px`,
+      height: `${from.rect.height}px`,
+      margin: '0',
+      translate: 'none',
+      transformOrigin: 'top left',
+      pointerEvents: 'none',
+      zIndex: '50',
+    });
+    target.ownerDocument.body.append(ghost);
+    this.#moments.animate(target, [{ opacity: 0 }, { opacity: 1 }], {
+      duration: 220,
+      delay: 400,
+      easing: 'ease-out',
+      fill: 'backwards',
+    });
+    // It lands, or stops when the moment does: either way the copy goes.
+    const land = () => ghost.remove();
+    void flight.finished.then(land, land);
+  }
 
   protected readonly slots = computed(() => {
     const room = this.room();

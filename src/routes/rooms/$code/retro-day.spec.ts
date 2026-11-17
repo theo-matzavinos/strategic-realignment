@@ -5,6 +5,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { viewFor, type PlayerView } from '../../../game/view';
 import { Rooms, type ServerRoom } from '../../../server/rooms';
+import { provideMoments } from './moments';
 import { RetroDay } from './retro-day';
 
 /** Five players in sprint 1's retro, with no vote yet; you are the first. */
@@ -25,6 +26,8 @@ function retroRoom(): { room: ServerRoom; ids: string[] } {
 
 function render(view: PlayerView): ComponentFixture<RetroDay> {
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+  // The room table provides the moments in the app; here they follow the component's own input.
+  TestBed.overrideComponent(RetroDay, { add: { providers: [provideMoments(RetroDay)] } });
   const fixture = TestBed.createComponent(RetroDay);
   fixture.componentRef.setInput('room', view);
   fixture.detectChanges();
