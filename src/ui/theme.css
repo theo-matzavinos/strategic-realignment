@@ -1,121 +1,223 @@
-@import '@fontsource-variable/hanken-grotesk';
+@import '@fontsource-variable/figtree';
+@import '@fontsource-variable/figtree/wght-italic.css';
 
-@custom-variant dark (&:not(:where(.light, .light *)));
-@custom-variant light (&:where(.light, .light *));
-
-:root,
-.dark {
+/*
+ * The Sprint Calendar system, dark only. DESIGN.md records why each token exists.
+ * Raw values live here once; Tailwind reads them through `@theme inline` below.
+ */
+:root {
   color-scheme: dark;
-  --background: #141414;
-  --foreground: #ededeb;
-  --surface: #1c1c1c;
-  --muted: #2a2a2a;
-  --muted-foreground: #a3a3a0;
-  --border: #2e2e2e;
-  --input: #6b6b68;
-  --primary: #26803f;
-  --primary-foreground: #ffffff;
-  --destructive: #c4471a;
-  --destructive-text: #e0906f;
-  --success: #7fd49a;
-  --warning: #e9b86a;
-  --ring: #4cc46f;
-  --radius: 10px;
-  --edge: inset 0 -1px 0 rgb(0 0 0 / 0.16), 0 1px 2px rgb(0 0 0 / 0.4);
-  --scrim: rgb(0 0 0 / 0.55);
-}
 
-.light {
-  color-scheme: light;
-  --background: #e9e9e7;
-  --foreground: #1b1b1b;
-  --surface: #f7f7f6;
-  --muted: #fbfbfa;
-  --muted-foreground: #5b5b58;
-  --border: #d3d3d0;
-  --input: #858581;
-  --primary: #26803f;
-  --primary-foreground: #ffffff;
-  --destructive: #b8421a;
-  --destructive-text: #b8421a;
-  --success: #1d6b37;
-  --warning: #80560a;
-  --ring: #26803f;
-  --edge: inset 0 -1px 0 rgb(0 0 0 / 0.1), 0 1px 2px rgb(0 0 0 / 0.1);
-  --scrim: rgb(20 20 20 / 0.4);
+  /* Surfaces, from the page outwards. */
+  --ground: #191817;
+  --chrome: #100f0e;
+  --raised: #22211f;
+  --sunken: #141312;
+  --line: #312f2c;
+  --line-soft: #272523;
+  --control-line: #5a5650;
+
+  /* Text. `faint` is #8f8a83, not the mock's #75706a, which is 3.3–3.9:1 on these surfaces. */
+  --fg: #f1eeea;
+  --fg-muted: #a29d96;
+  --fg-faint: #8f8a83;
+
+  /* Brand: blue text and outlines; filled controls use the deeper `brand-fill` for 4.5:1 white text. */
+  --brand: #3b8ee8;
+  --brand-fill: #2a74c9;
+  /* Brand text on a brand tint, where `brand` itself reaches only 4.4:1. */
+  --brand-text: #63a6f0;
+  --brand-fg: #ffffff;
+
+  /* Status: text on its own background. */
+  --ok: #7fd49a;
+  --ok-bg: #1d3626;
+  --ok-line: #2c5a3c;
+  --bad: #ff8a7a;
+  --bad-bg: #3a1f1b;
+  --bad-line: #5c2c26;
+  --bad-fill: #c0453b;
+  --warn: #f0c06a;
+  --warn-bg: #3a2c12;
+  --neutral-bg: #2e2b28;
+
+  /* Calendar slots: a hatched "Busy" block, and the dashed outline of an open one. */
+  --busy: #34312d;
+  --busy-alt: #2a2825;
+  --busy-edge: #7b766f;
+  --busy-fg: #c9c3bb;
+  --open-line: #4a4642;
+
+  /* Card types. Bands carry dark `paper-ink` text, which is 4.7:1 or more on every one of them. */
+  --leadership: #e05a4f;
+  --feature: #4c8fe0;
+  --workaround: #e8a93c;
+  --tests: #2fb2a8;
+  --refactoring: #6cbf5a;
+  --status: #9a8cf0;
+  --workshop: #c75bd6;
+
+  /* Card faces: light paper on the dark table. */
+  --paper: #f4f1ec;
+  --paper-ink: #1d1b18;
+  --paper-muted: #615c55;
+  --paper-line: #ddd8d0;
+
+  /* Attendee initials: light fills that `paper-ink` reads on; seat n always gets --seat-n. */
+  --seat-0: #9fc5f8;
+  --seat-1: #f4b183;
+  --seat-2: #b4e3a8;
+  --seat-3: #e3b4e8;
+  --seat-4: #f8e08e;
+  --seat-5: #a8e0dc;
+  --seat-6: #f5a3a3;
+  --seat-7: #c9c0f5;
+  --seat-8: #d8cfa8;
+  --seat-9: #9fd8b8;
+
+  --scrim: rgb(8 8 7 / 0.55);
+  --radius: 6px;
 }
 
 @theme inline {
-  --font-sans: 'Hanken Grotesk Variable', system-ui, sans-serif;
+  --font-sans: 'Figtree Variable', system-ui, sans-serif;
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-text: var(--destructive-text);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-ring: var(--ring);
+  /*
+   * `desk:` is 1280 px and up, the narrowest width where the whole week plus attendees fits: Friday's
+   * Ready button needs about 1040 px during the review. Below it the page is the phone day view.
+   */
+  --breakpoint-desk: 80rem;
+
+  --color-ground: var(--ground);
+  --color-chrome: var(--chrome);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-control-line: var(--control-line);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-brand: var(--brand);
+  --color-brand-fill: var(--brand-fill);
+  --color-brand-text: var(--brand-text);
+  --color-brand-fg: var(--brand-fg);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-line: var(--ok-line);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --color-bad-line: var(--bad-line);
+  --color-bad-fill: var(--bad-fill);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-busy: var(--busy);
+  --color-busy-alt: var(--busy-alt);
+  --color-busy-edge: var(--busy-edge);
+  --color-busy-fg: var(--busy-fg);
+  --color-open-line: var(--open-line);
+  --color-leadership: var(--leadership);
+  --color-feature: var(--feature);
+  --color-workaround: var(--workaround);
+  --color-tests: var(--tests);
+  --color-refactoring: var(--refactoring);
+  --color-status: var(--status);
+  --color-workshop: var(--workshop);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-muted: var(--paper-muted);
+  --color-paper-line: var(--paper-line);
   --color-scrim: var(--scrim);
 
-  /* Derived tints: mixed from the tokens, never stored. */
-  --color-primary-hover: color-mix(in oklab, var(--primary), #000 12%);
-  --color-primary-pressed: color-mix(in oklab, var(--primary), #000 22%);
-  --color-destructive-hover: color-mix(in oklab, var(--destructive), #000 12%);
-  --color-destructive-pressed: color-mix(in oklab, var(--destructive), #000 22%);
-  --color-muted-hover: color-mix(in oklab, var(--foreground) 8%, var(--muted));
-  --color-muted-pressed: color-mix(in oklab, var(--foreground) 14%, var(--muted));
-  --color-destructive-tint: color-mix(in oklab, var(--destructive) 14%, var(--surface));
+  /*
+   * The names the lobby page still uses until slice 3 moves it onto the tokens above. They point at
+   * the new palette, so nothing renders in the old one.
+   */
+  --color-background: var(--ground);
+  --color-foreground: var(--fg);
+  --color-surface: var(--raised);
+  --color-border: var(--line);
+  --color-muted-foreground: var(--fg-muted);
+  --color-destructive-text: var(--bad);
+  --color-success: var(--ok);
+  --color-warning: var(--warn);
 
-  --radius-checkbox: calc(var(--radius) - 5px);
-  --radius-option: calc(var(--radius) - 4px);
-  --radius-segment: calc(var(--radius) - 3px);
+  /* Derived tints: mixed from the tokens, never stored. */
+  /* Hover and press go darker: lighter than `brand-fill` drops white text under 4.5:1. */
+  --color-brand-hover: color-mix(in oklab, var(--brand-fill), #000 8%);
+  --color-brand-pressed: color-mix(in oklab, var(--brand-fill), #000 14%);
+  --color-brand-tint: color-mix(in oklab, var(--brand) 14%, transparent);
+  --color-raised-hover: color-mix(in oklab, var(--fg) 7%, var(--raised));
+  --color-raised-pressed: color-mix(in oklab, var(--fg) 12%, var(--raised));
+
   --radius-control-sm: calc(var(--radius) - 2px);
   --radius-control: var(--radius);
-  --radius-menu: calc(var(--radius) + 2px);
-  --radius-surface: calc(var(--radius) + 4px);
+  --radius-surface: calc(var(--radius) + 2px);
+  --radius-card: calc(var(--radius) + 4px);
   --radius-dialog: calc(var(--radius) + 6px);
 
-  --text-display: 28px;
-  --text-display--line-height: 1.15;
-  --text-display--letter-spacing: -0.015em;
-  --text-display--font-weight: 700;
-  --text-headline: 20px;
-  --text-headline--line-height: 1.25;
-  --text-headline--letter-spacing: -0.01em;
-  --text-headline--font-weight: 650;
+  --text-display: 30px;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 800;
+  --text-headline: 22px;
+  --text-headline--line-height: 1.2;
+  --text-headline--letter-spacing: -0.015em;
+  --text-headline--font-weight: 800;
   --text-title: 15px;
-  --text-title--line-height: 1.45;
-  --text-title--font-weight: 650;
-  --text-body: 13px;
-  --text-body--line-height: 1.45;
+  --text-title--line-height: 1.3;
+  --text-title--font-weight: 700;
+  --text-body: 14px;
+  --text-body--line-height: 1.4;
   --text-body--font-weight: 400;
-  --text-label: 12px;
-  --text-label--line-height: 1.45;
+  --text-label: 12.5px;
+  --text-label--line-height: 1.35;
   --text-label--font-weight: 600;
+  --text-caption: 11.5px;
+  --text-caption--line-height: 1.3;
+  --text-caption--font-weight: 700;
 
-  --shadow-edge: var(--edge);
-  --shadow-pressed: inset 0 1px 2px rgb(0 0 0 / 0.25);
-  --shadow-popover: 0 8px 24px rgb(0 0 0 / 0.22), 0 2px 6px rgb(0 0 0 / 0.12);
-  --shadow-dialog: 0 16px 40px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.18);
+  --shadow-edge: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-pressed: inset 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-card:
+    inset 0 1px 0 rgb(255 255 255 / 0.6), 0 8px 18px rgb(0 0 0 / 0.45), 0 2px 4px rgb(0 0 0 / 0.3);
+  --shadow-card-lifted: 0 16px 26px rgb(0 0 0 / 0.5), 0 3px 6px rgb(0 0 0 / 0.3);
+  --shadow-tray: 0 -10px 24px rgb(0 0 0 / 0.45);
+  --shadow-dialog: 0 30px 80px rgb(0 0 0 / 0.65), 0 4px 12px rgb(0 0 0 / 0.3);
 }
 
 @layer base {
   html {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--ground);
+    color: var(--fg);
     font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    scrollbar-color: var(--control-line) var(--sunken);
   }
 
   /* On body, not html: rem stays 16px, so Tailwind's spacing scale keeps its sizes. */
   body {
+    background-color: var(--ground);
     font-size: var(--text-body);
     line-height: var(--text-body--line-height);
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--brand) 55%, transparent);
+    color: var(--fg);
+  }
+
+  :focus-visible {
+    outline-color: var(--brand);
+  }
+
+  input,
+  textarea {
+    caret-color: var(--brand);
+  }
+
+  a {
+    text-underline-offset: 3px;
   }
 }

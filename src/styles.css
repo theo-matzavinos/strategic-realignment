@@ -2,3 +2,6 @@
 
 @import 'tailwindcss';
 @import './ui/theme.css';
+
+/* The tests' selectors aren't class names. */
+@source not '../e2e';

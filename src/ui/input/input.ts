@@ -4,12 +4,12 @@ import { cn } from '../cn';
 
 /** The text control look, shared with Textarea. */
 export const inputClasses = [
-  'w-full min-w-0 rounded-control border border-input bg-surface px-2.5 text-body text-foreground',
-  'placeholder:text-muted-foreground',
+  'w-full min-w-0 rounded-control border border-control-line bg-sunken px-3 text-[16px] font-semibold text-fg',
+  'placeholder:font-normal placeholder:text-fg-faint',
   'transition-[border-color] duration-120 ease-out motion-reduce:transition-none',
-  'hover:border-[color-mix(in_oklab,var(--input),var(--foreground)_35%)] disabled:border-input',
-  'focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-  'aria-invalid:border-destructive-text',
+  'hover:border-[color-mix(in_oklab,var(--control-line),var(--fg)_35%)] disabled:border-control-line',
+  'focus-visible:border-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+  'aria-invalid:border-bad',
   '[&[readonly]]:border-dashed [&[readonly]]:bg-transparent',
   'disabled:cursor-not-allowed disabled:opacity-50',
 ];
@@ -32,5 +32,5 @@ export const inputClasses = [
 export class Input {
   readonly class = input('');
 
-  protected readonly classes = computed(() => cn(inputClasses, 'h-8', this.class()));
+  protected readonly classes = computed(() => cn(inputClasses, 'h-10', this.class()));
 }

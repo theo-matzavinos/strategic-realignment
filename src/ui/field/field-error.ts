@@ -19,7 +19,7 @@ export class FieldError {
 
   protected readonly classes = computed(() =>
     cn(
-      'flex gap-1.5 text-label font-normal text-destructive-text [&>svg]:h-lh [&>svg]:w-3.5 [&>svg]:shrink-0',
+      'flex gap-1.5 text-label font-normal text-bad [&>svg]:h-lh [&>svg]:w-3.5 [&>svg]:shrink-0',
       this.class(),
     ),
   );

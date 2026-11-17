@@ -25,7 +25,7 @@
     "@angular/platform-server": "22.2.2",
     "@angular/router": "22.2.2",
     "@angular/ssr": "22.2.2",
-    "@fontsource-variable/hanken-grotesk": "5.3.0",
+    "@fontsource-variable/figtree": "5.3.0",
     "@loozo/angular-launch": "0.0.6",
     "@loozo/angular-router": "0.0.8",
     "@loozo/origami-ui": "0.0.4",

@@ -12,6 +12,6 @@ export class FieldDescription {
   readonly class = input('');
 
   protected readonly classes = computed(() =>
-    cn('text-label font-normal text-muted-foreground', this.class()),
+    cn('text-label font-normal text-fg-muted', this.class()),
   );
 }

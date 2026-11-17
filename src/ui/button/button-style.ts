@@ -4,10 +4,10 @@ import { tv } from '../cn';
 
 export const buttonVariants = tv({
   base: [
-    'inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap',
-    'rounded-control border border-transparent text-body font-semibold',
-    'transition-[background-color,box-shadow,translate] duration-120 ease-out motion-reduce:transition-none',
-    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+    'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap',
+    'rounded-control border border-transparent text-body font-bold',
+    'transition-[background-color,border-color,box-shadow,translate] duration-120 ease-out motion-reduce:transition-none',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
     'not-data-disabled:active:translate-y-px not-data-disabled:active:shadow-pressed',
     'data-disabled:cursor-not-allowed data-disabled:opacity-50 data-disabled:shadow-none',
     '[&_svg]:size-4 [&_svg]:shrink-0',
@@ -15,19 +15,21 @@ export const buttonVariants = tv({
   variants: {
     variant: {
       primary:
-        'bg-primary text-primary-foreground shadow-edge not-data-disabled:hover:bg-primary-hover not-data-disabled:active:bg-primary-pressed',
+        'bg-brand-fill text-brand-fg shadow-edge not-data-disabled:hover:bg-brand-hover not-data-disabled:active:bg-brand-pressed',
       secondary:
-        'border-input bg-muted text-foreground shadow-edge not-data-disabled:hover:bg-muted-hover not-data-disabled:active:bg-muted-pressed',
-      destructive:
-        'bg-destructive text-primary-foreground shadow-edge not-data-disabled:hover:bg-destructive-hover not-data-disabled:active:bg-destructive-pressed',
+        'border-line bg-raised text-fg not-data-disabled:hover:bg-raised-hover not-data-disabled:active:bg-raised-pressed',
+      positive:
+        'border-ok-line bg-ok-bg text-ok not-data-disabled:hover:bg-[color-mix(in_oklab,var(--ok-bg),var(--ok)_12%)]',
+      negative:
+        'border-bad-line bg-bad-bg text-bad not-data-disabled:hover:bg-[color-mix(in_oklab,var(--bad-bg),var(--bad)_12%)]',
       ghost:
-        'bg-transparent text-foreground not-data-disabled:hover:bg-foreground/8 not-data-disabled:active:bg-foreground/14',
-      link: 'bg-transparent text-foreground underline decoration-1 underline-offset-3 not-data-disabled:hover:decoration-2 not-data-disabled:active:translate-y-0 not-data-disabled:active:shadow-none',
+        'bg-transparent text-fg not-data-disabled:hover:bg-fg/8 not-data-disabled:active:bg-fg/14',
+      link: 'bg-transparent text-fg underline decoration-1 underline-offset-3 not-data-disabled:hover:decoration-2 not-data-disabled:active:translate-y-0 not-data-disabled:active:shadow-none',
     },
     size: {
-      sm: 'h-7 rounded-control-sm px-2.5 text-label',
-      md: 'h-8 px-3',
-      lg: 'h-9 px-4 text-title font-semibold',
+      sm: 'h-8 rounded-control-sm px-3 text-label',
+      md: 'h-9 px-3.5',
+      lg: 'h-11 px-4 text-title',
       icon: 'size-8 px-0',
     },
   },

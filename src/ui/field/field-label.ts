@@ -12,9 +12,6 @@ export class FieldLabel {
   readonly class = input('');
 
   protected readonly classes = computed(() =>
-    cn(
-      'text-body font-semibold text-foreground group-data-disabled/field:opacity-50',
-      this.class(),
-    ),
+    cn('text-label text-fg group-data-disabled/field:opacity-50', this.class()),
   );
 }
