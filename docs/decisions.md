@@ -234,3 +234,20 @@ The source is public. Team game sessions run on a private deployment, to be chos
 **Why:** the reasons for B are social: a prior near 5–7's, two suspects, and votes and defences that can line up. No simulation measures deduction or fun. The one measured advantage that bears on them is that the Plants' choices move the outcome more under B than under A. On the simulations alone, A is the closer calibration match and the smaller change. The Plants' knowledge of each other was simulated as two independent Plants; how it changes card play and votes is unmeasured. Every number stays a knob, and the paper playtest decides.
 
 The simulators were throwaway, as verification 01's was; their patches and reports are kept with this slice's notes ([verification 04](verification/04-ten-players.md#evidence-kept)).
+
+## D19. The game looks like a parody of a group calendar
+
+**2026-11-17**
+
+**Context:** the first playable game was a stack of plain panels. Before the team playtest, the room had to look and feel like a game: real cards, a table instead of a page, staged moments, and a lobby to match. The satire could live in the interface itself (a parody of the tools a toxic workplace runs on) or only in the card text.
+
+**Options:**
+
+- **Sprint Calendar:** the room is a week view. Leadership's demand is a required invite on Monday, contributions are bookings ("Busy · private"), the reveal is Thursday's Sprint Review, the retro is Friday's poll, and phase changes arrive as meeting reminders.
+- **Retro Whiteboard:** sticky notes on a canvas, dot-voting for audits, live cursors. Familiar, and live cursors would be new realtime data that could hint at a player's choice.
+- **Build Log:** a CI terminal transcript. Engineers know it at once, but it mocks their own tools rather than corporate dysfunction, and it's slow to scan during a call.
+- **Digital tabletop:** a felt table with illustrated cards, the standard online party-game look. It moves the satire back into the card text.
+
+**Chosen:** Sprint Calendar. The rules' nouns (Progress, Morale, Debt, Audits, Contribute, the roles, cards and demands) stay exactly as [rules.md](rules.md) has them. Only verbs and statuses come from the calendar (Book, Busy, Accepted, Reminder). [DESIGN.md](../DESIGN.md) records the system and [PRODUCT.md](../PRODUCT.md) the product facts behind it.
+
+**Why:** a calendar is where workplace dysfunction already lives, so the joke is the process itself, and its week maps the sprint's phases onto days without inventing new structure. The motion follows one rule that matters for the game: the reveal turns over in the server's shuffled order only, and a moment plays only on a change the page receives, never on load, so nothing in the presentation can hint at who played what.
