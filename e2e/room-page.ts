@@ -1,8 +1,41 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
-/** The rows of the room page's player list. */
+/** The rows of the waiting list, while the room waits for the host to start. */
 export function players(page: Page) {
   return page.getByRole('region', { name: 'Players' }).getByRole('listitem');
+}
+
+/** The rows of the attendee list, once the game is on. */
+export function attendees(page: Page) {
+  return page.getByRole('region', { name: /^Attendees · \d+$/ }).getByRole('listitem');
+}
+
+/** Below 1280 px the table is a day view: one day's lane at a time, picked by its tab. */
+export function isPhone(page: Page): boolean {
+  return page.viewportSize()!.width < 1280;
+}
+
+export type DayName = 'Demand' | 'Contribute' | 'Sprint Review' | 'Retro';
+
+/**
+ * One day's lane of the week. At phone width it taps the day's tab first, as a player does, since
+ * only the selected day shows.
+ */
+export async function showDay(page: Page, day: DayName): Promise<Locator> {
+  if (isPhone(page)) {
+    const tab = page
+      .getByRole('group', { name: 'Days' })
+      .getByRole('button', { name: new RegExp(`${day}$`) });
+    if ((await tab.getAttribute('aria-pressed')) !== 'true') {
+      await tab.click();
+    }
+    await expect(tab).toHaveAttribute('aria-pressed', 'true');
+  }
+
+  const lane = page.getByRole('region', { name: day, exact: true });
+  await expect(lane).toBeVisible();
+
+  return lane;
 }
 
 /** Waits for the browser app, since the lobby's buttons stay disabled until it runs. */
@@ -144,3 +177,120 @@ export const publicPlayerKeys = [
   'name',
   'playerId',
 ];
+
+/** The window widths between the phone and the full week, where the day view stretches. */
+const middleWidths = [721, 800, 1024, 1279];
+
+/**
+ * No text or control on the page is cut off: no text runs past an ancestor that hides overflow (or
+ * past the screen, outside a sideways scroller), and no button's or label's content is wider than
+ * it. On the day view it checks each day's lane, then returns to the day that was shown. From a desktop
+ * width it also checks the widths in between, then restores the window.
+ */
+export async function expectNothingClipped(page: Page): Promise<void> {
+  const viewport = page.viewportSize()!;
+  const widths = [viewport.width];
+  if (!isPhone(page)) {
+    widths.unshift(...middleWidths);
+  }
+
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: viewport.height });
+    const tabs = page.getByRole('group', { name: 'Days' });
+    if (!isPhone(page)) {
+      expect(await page.evaluate(findClipping), `at ${width} px`).toEqual([]);
+      continue;
+    }
+
+    const shown = tabs.locator('[aria-pressed="true"]');
+    const shownName = (await shown.textContent())!;
+    const buttons = tabs.getByRole('button');
+    for (let index = 0; index < 4; index++) {
+      const day = buttons.nth(index);
+      await day.click();
+      await expect(day).toHaveAttribute('aria-pressed', 'true');
+      const name = await day.textContent();
+      expect(await page.evaluate(findClipping), `at ${width} px on ${name}`).toEqual([]);
+    }
+    const back = buttons.filter({ hasText: shownName });
+    await back.click();
+    await expect(back).toHaveAttribute('aria-pressed', 'true');
+  }
+}
+
+/** Runs in the page: a description of each piece of text or control that's cut off. */
+function findClipping(): string[] {
+  const cut: string[] = [];
+  const describe = (element: Element) =>
+    `<${element.tagName.toLowerCase()}> ${(element.textContent ?? '').replace(/\s+/g, ' ').trim()}`;
+  const isHidden = (element: Element) =>
+    element.closest('[aria-hidden="true"]') !== null || !element.checkVisibility();
+  const hides = (value: string) => value === 'hidden' || value === 'clip';
+  const scrolls = (value: string) => value === 'auto' || value === 'scroll';
+
+  const texts = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let text = texts.nextNode(); text !== null; text = texts.nextNode()) {
+    const parent = text.parentElement!;
+    const box = parent.getBoundingClientRect();
+    // Visually hidden text, such as an sr-only label, is a 1 px box by design.
+    if (!text.textContent!.trim() || isHidden(parent) || box.width <= 1 || box.height <= 1) {
+      continue;
+    }
+
+    const limit = {
+      left: 0,
+      right: document.documentElement.clientWidth,
+      top: -Infinity,
+      bottom: Infinity,
+    };
+    let clipper: Element | null = null;
+    for (let node: Element | null = parent; node !== null; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (scrolls(style.overflowX)) {
+        limit.left = -Infinity;
+        limit.right = Infinity;
+      }
+      if (
+        clipper === null &&
+        node !== document.documentElement &&
+        (hides(style.overflowX) || hides(style.overflowY))
+      ) {
+        clipper = node;
+      }
+    }
+    if (clipper !== null) {
+      const clip = clipper.getBoundingClientRect();
+      limit.left = Math.max(limit.left, clip.left);
+      limit.right = Math.min(limit.right, clip.right);
+      limit.top = clip.top;
+      limit.bottom = clip.bottom;
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(text);
+    for (const line of range.getClientRects()) {
+      const past = Math.max(
+        limit.left - line.left,
+        line.right - limit.right,
+        limit.top - line.top,
+        line.bottom - limit.bottom,
+      );
+      if (line.width > 0 && past > 0.5) {
+        cut.push(`${describe(parent)} is cut by ${Math.round(past)} px`);
+        break;
+      }
+    }
+  }
+
+  for (const control of document.querySelectorAll('button, label, a, [role="status"]')) {
+    if (isHidden(control) || control.getBoundingClientRect().width <= 1) {
+      continue;
+    }
+    const over = control.scrollWidth - control.clientWidth;
+    if (over > 0) {
+      cut.push(`${describe(control)} overflows by ${over} px`);
+    }
+  }
+
+  return cut;
+}

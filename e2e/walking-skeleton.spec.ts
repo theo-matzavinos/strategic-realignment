@@ -1,10 +1,12 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { newPlayerContext } from './access';
 import {
+  attendees,
   fillWhenReady,
   players,
   publicPlayerKeys,
   readViewSnapshot,
+  showDay,
   stringsIn,
   viewKeys,
 } from './room-page';
@@ -53,7 +55,7 @@ test('five isolated players create, join and start a game, each seeing only thei
 
     await expect(host).toHaveURL(/\/rooms\/[A-Z]{4}$/);
     const code = new URL(host.url()).pathname.split('/').at(-1)!;
-    await expect(host.getByRole('heading', { level: 1 })).toHaveText(code);
+    await expect(host.getByRole('heading', { level: 1 })).toHaveText(`Team calendar ${code}`);
     await expect(players(host)).toHaveText([/^Ana \(host\) \(you\)$/]);
 
     // Four more players join by code, typed in lower case; everyone already in sees each arrival.
@@ -97,11 +99,18 @@ test('five isolated players create, join and start a game, each seeing only thei
     await expect(players(host)).toHaveCount(5);
     await expect(host.getByRole('button', { name: 'Start the game' })).toBeEnabled();
 
-    // Ana starts; every page moves to Contribute with its own role and hand.
+    // Ana starts; every page moves to sprint 1's booking with its own role and hand.
     const started = performance.now();
     await host.getByRole('button', { name: 'Start the game' }).click();
     await Promise.all(
-      pages.map((page) => expect(page.getByText('Sprint 1 · Contribute')).toBeVisible()),
+      pages.map(async (page) => {
+        await expect(
+          page.getByRole('list', { name: 'Sprints' }).locator('[aria-current="step"]'),
+        ).toHaveText('Sprint 1 of 4');
+        await expect(page.locator('[aria-current="date"]:visible')).toHaveText(
+          /^\s*Tue–Wed\s*Contribute\s*$/,
+        );
+      }),
     );
     test.info().annotations.push({
       type: 'timing',
@@ -111,19 +120,22 @@ test('five isolated players create, join and start a game, each seeing only thei
     let plants = 0;
     for (const page of pages) {
       const role = page.getByRole('region', { name: 'Your role' });
-      await expect(role).toHaveText(/Your role\s*(Management Plant|Delivery Team)/);
+      await expect(role).toHaveText(
+        /^\s*Your role\s*Only you can see this\s*(Management Plant|Delivery Team)\s*$/,
+      );
       if ((await role.textContent())?.includes('Management Plant')) {
         plants++;
       }
 
       // In Contribute, the hand is where you choose your card.
-      await expect(page.getByRole('region', { name: 'Your hand' }).getByRole('radio')).toHaveCount(
-        3,
-      );
-      await expect(page.getByRole('region', { name: "This sprint's demand" })).not.toBeEmpty();
-      await expect(players(page)).toHaveCount(5);
-      for (const player of await players(page).all()) {
-        await expect(player).toContainText('3 cards · Contributed: no');
+      await expect(
+        page.getByRole('region', { name: 'Your hand · 3 cards' }).getByRole('radio'),
+      ).toHaveCount(3);
+      await expect(await showDay(page, 'Demand')).toContainText('Required · from Leadership');
+      await expect(attendees(page)).toHaveCount(5);
+      for (const player of await attendees(page).all()) {
+        await expect(player).toContainText('3 cards');
+        await expect(player.locator('[data-slot="tag"]')).toHaveText(['Not booked']);
       }
     }
     expect(plants).toBe(1);

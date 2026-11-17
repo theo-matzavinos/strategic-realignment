@@ -4,139 +4,80 @@ import { Button } from '#ui/button';
 import { minPlayers } from '../../../game/game';
 import type { PlayerView } from '../../../game/view';
 import { JoinRoomForm } from '../../+lobby/join-room-form';
-import { AuditVote } from './audit-vote';
-import { BoardPanel } from './board-panel';
-import { DemandPanel } from './demand-panel';
-import { roleNames } from './display-names';
-import { HandPanel } from './hand-panel';
 import { panel } from './panel';
 import { PlayersPanel } from './players-panel';
-import { ResultPanel } from './result-panel';
-import { RetroPanel } from './retro-panel';
-import { RevealPanel } from './reveal-panel';
 import { RoomRequest } from './room-request';
+import { RoomTable } from './room-table';
 import { injectRoute } from './route.generated';
 import { injectRpc } from './rpc.generated';
-
-const phaseNames: Record<PlayerView['phase'], string> = {
-  lobby: 'Lobby',
-  contribute: 'Contribute',
-  retro: 'Retro',
-  ended: 'Game over',
-};
+import { TopBar } from './top-bar';
 
 @Component({
-  imports: [
-    AuditVote,
-    BoardPanel,
-    Button,
-    DemandPanel,
-    HandPanel,
-    JoinRoomForm,
-    PlayersPanel,
-    ResultPanel,
-    RetroPanel,
-    RevealPanel,
-    RouterLink,
-  ],
+  imports: [Button, JoinRoomForm, PlayersPanel, RoomTable, RouterLink, TopBar],
   template: `
-    <main class="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10 wrap-anywhere">
-      <header class="flex flex-wrap items-end justify-between gap-4">
-        <div class="flex flex-col">
-          <p class="text-label text-muted-foreground">Room code</p>
-          <h1 class="text-display tracking-[0.2em]">{{ code() }}</h1>
-        </div>
-        <div class="flex items-center gap-3">
-          <p role="status" class="text-label" [class.text-success]="view.status() === 'open'">
-            {{ statusText() }}
-          </p>
-          @if (canReconnect()) {
-            <button foldButton size="sm" (click)="view.reconnect()">Reconnect</button>
-          }
-        </div>
-      </header>
+    <div class="flex min-h-dvh flex-col">
+      <app-top-bar
+        [code]="code()"
+        [sprint]="sprint()"
+        [status]="statusText()"
+        [live]="view.status() === 'open'"
+        [canReconnect]="canReconnect()"
+        (reconnect)="view.reconnect()"
+      />
 
       @if (invalidCode()) {
-        <p>This isn't a room code. <a routerLink="/" class="underline">Back to the lobby</a></p>
+        <main class="mx-auto w-full max-w-3xl px-4 py-10">
+          <p>This isn't a room code. <a routerLink="/" class="underline">Back to the lobby</a></p>
+        </main>
       } @else if (refused()) {
-        <section aria-labelledby="join-heading" [class]="panel">
-          <h2 id="join-heading" class="text-headline">Join this room</h2>
-          <p class="text-muted-foreground">You don't have a seat in this room yet.</p>
-          <app-join-room-form [code]="code()" (joined)="view.reconnect()" />
-        </section>
+        <main class="mx-auto w-full max-w-3xl px-4 py-10">
+          <section aria-labelledby="join-heading" [class]="panel">
+            <h2 id="join-heading" class="text-headline">Join this room</h2>
+            <p class="text-fg-muted">You don't have a seat in this room yet.</p>
+            <app-join-room-form [code]="code()" (joined)="view.reconnect()" />
+          </section>
+        </main>
       } @else if (view.value(); as room) {
-        @if (room.phase !== 'lobby') {
-          <p class="text-title">Sprint {{ room.sprint }} · {{ phaseNames[room.phase] }}</p>
-
-          @if (room.phase === 'ended') {
-            <app-result-panel [room]="room" />
-            @if (room.vote !== null) {
-              <div [class]="panel">
-                <p class="text-muted-foreground">The game ended on this audit: Morale reached 0.</p>
-                <app-audit-vote [room]="room" />
-              </div>
-            }
-          }
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <section aria-labelledby="role-heading" [class]="panel">
-              <h2 id="role-heading" class="text-label text-muted-foreground">Your role</h2>
-              @if (room.me.role; as role) {
-                <p class="text-headline">{{ roleNames[role] }}</p>
-              }
-            </section>
-
-            <app-demand-panel [room]="room" />
-          </div>
-
-          <app-board-panel [board]="room.board" />
-
-          @if (room.phase === 'contribute') {
-            <app-hand-panel [room]="room" />
-          }
-          @if (room.lastReveal !== null) {
-            <app-reveal-panel [room]="room" />
-          }
-          @if (room.phase === 'retro') {
-            <app-retro-panel [room]="room" />
-          }
-          @if (room.phase !== 'contribute') {
-            <app-hand-panel [room]="room" />
-          }
-        }
-
-        <app-players-panel [room]="room" />
-
         @if (room.phase === 'lobby') {
-          @if (isHost(room)) {
-            <div class="flex flex-col items-start gap-2">
-              <button
-                foldButton
-                variant="primary"
-                size="lg"
-                [disabled]="start.pending() || room.players.length < minPlayers"
-                focusableWhenDisabled
-                (click)="startGame()"
-              >
-                Start the game
-              </button>
-              @if (room.players.length < minPlayers) {
-                <p class="text-muted-foreground">
-                  The game needs at least {{ minPlayers }} players. Share the code above.
-                </p>
-              }
-              @if (start.error(); as message) {
-                <p role="alert" class="text-destructive-text">{{ message }}</p>
-              }
-            </div>
-          } @else {
-            <p class="text-muted-foreground">Waiting for the host to start the game.</p>
-          }
+          <main class="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10 wrap-anywhere">
+            <app-players-panel [room]="room" />
+
+            @if (isHost(room)) {
+              <div class="flex flex-col items-start gap-2">
+                <button
+                  foldButton
+                  variant="primary"
+                  size="lg"
+                  [disabled]="start.pending() || room.players.length < minPlayers"
+                  focusableWhenDisabled
+                  (click)="startGame()"
+                >
+                  Start the game
+                </button>
+                @if (room.players.length < minPlayers) {
+                  <p class="text-fg-muted">
+                    The game needs at least {{ minPlayers }} players. Share the code above.
+                  </p>
+                }
+                @if (start.error(); as message) {
+                  <p role="alert" class="text-bad">{{ message }}</p>
+                }
+              </div>
+            } @else {
+              <p class="text-fg-muted">Waiting for the host to start the game.</p>
+            }
+          </main>
+        } @else {
+          <main class="flex flex-1 flex-col">
+            <app-room-table [room]="room" />
+          </main>
         }
       } @else {
-        <p class="text-muted-foreground">Loading the room…</p>
+        <main class="mx-auto w-full max-w-3xl px-4 py-10">
+          <p class="text-fg-muted">Loading the room…</p>
+        </main>
       }
-    </main>
+    </div>
   `,
 })
 export default class RoomPage {
@@ -144,8 +85,6 @@ export default class RoomPage {
   readonly #rpc = injectRpc();
 
   protected readonly panel = panel;
-  protected readonly phaseNames = phaseNames;
-  protected readonly roleNames = roleNames;
   protected readonly minPlayers = minPlayers;
 
   protected readonly code = computed(() => this.#route.params().code.toUpperCase());
@@ -155,6 +94,16 @@ export default class RoomPage {
   });
 
   /** `seated` refuses the stream when this browser has no seat here, or there's no such room. */
+  /** The sprint indicator shows only once a game is on. */
+  protected readonly sprint = computed(() => {
+    const room = this.view.value();
+    if (room === null || room.phase === 'lobby') {
+      return null;
+    }
+
+    return room.sprint;
+  });
+
   protected readonly refused = computed(() => this.#failedWith('FORBIDDEN'));
   protected readonly invalidCode = computed(() => this.#failedWith('INVALID_INPUT'));
   protected readonly canReconnect = computed(() => {

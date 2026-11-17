@@ -1,4 +1,4 @@
-import { computed, effect, signal } from '@angular/core';
+import { computed, effect, linkedSignal, signal } from '@angular/core';
 import { frameworkFailures, RpcError } from '@loozo/angular-launch';
 import type { PlayerView } from '../../../game/view';
 
@@ -13,12 +13,21 @@ type Wait = { until: 'answer' } | { until: 'version'; version: number };
  * re-enables it at once with its message, and so does a lost answer, with "Couldn't reach the
  * server". A retry is checked against the current game: one whose earlier attempt still stands gets
  * its declared refusal, while a Ready that a nomination has since cleared is accepted again.
+ *
+ * A message belongs to the step of the game it was sent in: a new phase, sprint or vote stage
+ * clears it, and a failure that lands after the game has moved on shows nothing. Within a step,
+ * show it only beside its control, so it goes once the action's effect replaces the control.
  */
 export class RoomRequest {
   readonly #view: () => PlayerView | null;
   readonly #wait = signal<Wait | null>(null);
+  /** A computed, so a snapshot within the same step doesn't reset `error`. */
+  readonly #step = computed(() => stepOf(this.#view()));
 
-  readonly error = signal<string | null>(null);
+  readonly error = linkedSignal<string, string | null>({
+    source: this.#step,
+    computation: () => null,
+  });
   readonly pending = computed(() => {
     const wait = this.#wait();
 
@@ -47,15 +56,35 @@ export class RoomRequest {
 
     this.#wait.set({ until: 'answer' });
     this.error.set(null);
+    const sentIn = this.#step();
 
     try {
       const accepted = await call();
       this.#wait.set({ until: 'version', version: accepted.version });
     } catch (error) {
       this.#wait.set(null);
-      this.error.set(messageFor(error));
+      if (this.#step() === sentIn) {
+        this.error.set(messageFor(error));
+      }
     }
   }
+}
+
+/** Where the game is: its phase and sprint, and in a retro whether its vote is open or decided. */
+function stepOf(view: PlayerView | null): string {
+  if (view === null) {
+    return 'none';
+  }
+
+  let vote = 'none';
+  if (view.vote !== null && view.vote.outcome === null) {
+    vote = 'open';
+  }
+  if (view.vote !== null && view.vote.outcome !== null) {
+    vote = 'decided';
+  }
+
+  return `${view.phase}:${view.sprint}:${vote}`;
 }
 
 function reached(wait: Wait, view: PlayerView | null): boolean {

@@ -148,4 +148,103 @@ describe('RoomRequest', () => {
     expect(vote.pending()).toBe(false);
     expect(vote.error()).toBe("Couldn't reach the server. Try again.");
   });
+
+  it("keeps a lost answer's error through other players' snapshots in the same step", async () => {
+    const { room, ids } = retroRoom();
+    const stream = fakeView(room, ids[0]);
+    const ready = request(stream.view);
+    const call = deferred();
+
+    const sent = ready.send(() => call.promise);
+    call.reject(new TypeError('Failed to fetch'));
+    await sent;
+    room.act(ids[1], { type: 'finishRetro' });
+    stream.deliver(viewFor(room, ids[0]));
+
+    expect(ready.error()).toBe("Couldn't reach the server. Try again.");
+  });
+
+  it("clears a lost Ready's error when the next sprint starts, and its Book's when the retro does", async () => {
+    const { room, ids } = retroRoom();
+    const stream = fakeView(room, ids[0]);
+    const ready = request(stream.view);
+    const book = request(stream.view);
+
+    // Accepted, but the answer is lost.
+    const readyCall = deferred();
+    const readySent = ready.send(() => readyCall.promise);
+    room.act(ids[0], { type: 'finishRetro' });
+    readyCall.reject(new TypeError('Failed to fetch'));
+    await readySent;
+    TestBed.tick();
+    expect(ready.error()).toBe("Couldn't reach the server. Try again.");
+
+    for (const id of ids.slice(1)) {
+      room.act(id, { type: 'finishRetro' });
+    }
+    stream.deliver(viewFor(room, ids[0]));
+    expect(stream.view().phase).toBe('contribute');
+    expect(stream.view().sprint).toBe(2);
+    expect(ready.error()).toBeNull();
+
+    // Sprint 2: the same for a Book whose answer is lost.
+    const bookCall = deferred();
+    const bookSent = book.send(() => bookCall.promise);
+    const [card] = viewFor(room, ids[0]).me.hand;
+    room.act(ids[0], { type: 'contribute', card });
+    bookCall.reject(new TypeError('Failed to fetch'));
+    await bookSent;
+    TestBed.tick();
+    expect(book.error()).toBe("Couldn't reach the server. Try again.");
+
+    for (const id of ids.slice(1)) {
+      const [other] = viewFor(room, id).me.hand;
+      room.act(id, { type: 'contribute', card: other });
+    }
+    stream.deliver(viewFor(room, ids[0]));
+    expect(stream.view().phase).toBe('retro');
+    expect(book.error()).toBeNull();
+    expect(ready.error()).toBeNull();
+  });
+
+  it('clears a vote error once the vote is decided', async () => {
+    const { room, ids } = retroRoom();
+    room.act(ids[1], { type: 'nominate', nominee: ids[2] });
+    const stream = fakeView(room, ids[0]);
+    const vote = request(stream.view);
+    const call = deferred();
+
+    const sent = vote.send(() => call.promise);
+    call.reject(new RpcError('ALREADY_VOTED', 409, null, "You've already voted."));
+    await sent;
+    TestBed.tick();
+    expect(vote.error()).toBe("You've already voted.");
+
+    for (const id of ids) {
+      room.act(id, { type: 'vote', yes: false });
+    }
+    stream.deliver(viewFor(room, ids[0]));
+
+    expect(stream.view().vote?.outcome).not.toBeNull();
+    expect(vote.error()).toBeNull();
+  });
+
+  it('shows nothing for a failure that lands after the game moved on', async () => {
+    const { room, ids } = retroRoom();
+    const stream = fakeView(room, ids[0]);
+    const ready = request(stream.view);
+    const call = deferred();
+
+    const sent = ready.send(() => call.promise);
+    for (const id of ids) {
+      room.act(id, { type: 'finishRetro' });
+    }
+    stream.deliver(viewFor(room, ids[0]));
+    call.reject(new TypeError('Failed to fetch'));
+    await sent;
+    TestBed.tick();
+
+    expect(ready.pending()).toBe(false);
+    expect(ready.error()).toBeNull();
+  });
 });

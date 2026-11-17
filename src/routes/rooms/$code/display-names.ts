@@ -18,14 +18,57 @@ export const cardNames: Record<CardType, string> = {
   workshop: 'Alignment Workshop',
 };
 
-/** What each card does, shortened from docs/rules.md's contribution deck. Display text only. */
+/** What each card does to the tracks, shortened from docs/rules.md's contribution deck. */
 export const cardEffects: Record<CardType, string> = {
   feature: '+2 Progress',
-  workaround: '+3 Progress, +1 Debt',
-  tests: '+1 Progress · Testing',
-  refactoring: '−2 Debt · Refactoring',
-  status: 'No effect · Visibility',
-  workshop: 'Meets the demand · every other card −2 Progress',
+  workaround: '+3 Progress · +1 Debt',
+  tests: '+1 Progress',
+  refactoring: '−2 Debt',
+  status: 'No effect',
+  workshop: 'Meets the demand',
+};
+
+/** The rest of a card's rule, on its footer: what it counts as, or the Workshop's cost. */
+export const cardTags: Record<CardType, string | null> = {
+  feature: null,
+  workaround: null,
+  tests: 'Counts as Testing',
+  refactoring: 'Counts as Refactoring',
+  status: 'Counts as Visibility',
+  workshop: 'Other cards −2 Progress',
+};
+
+/**
+ * A card's whole rule on one line, for where its face doesn't show, such as the reveal: the effect,
+ * then the rest of its footer. The Workshop's keeps its cost.
+ */
+export function cardRule(card: CardType): string {
+  const tag = cardTags[card];
+  if (tag === null) {
+    return cardEffects[card];
+  }
+
+  return `${cardEffects[card]} · ${tag}`;
+}
+
+/** The label on each card's colored band. */
+export const cardKinds: Record<CardType, string> = {
+  feature: 'Feature',
+  workaround: 'Workaround',
+  tests: 'Testing',
+  refactoring: 'Refactoring',
+  status: 'Visibility',
+  workshop: 'Workshop',
+};
+
+/** Approved flavor lines; display text only. */
+export const cardFlavors: Record<CardType, string> = {
+  feature: 'Ships what the roadmap promised. Mostly.',
+  workaround: 'Nothing is more permanent.',
+  tests: 'Green on my machine.',
+  refactoring: 'No visible change. You’re welcome.',
+  status: 'Per my last email.',
+  workshop: 'Let’s take this offline. All of it.',
 };
 
 export const demandNames: Record<DemandType, string> = {
@@ -37,14 +80,25 @@ export const demandNames: Record<DemandType, string> = {
   oneWeekSprint: 'The Sprint Is Now One Week',
 };
 
+/** Each demand's flavor line, from docs/rules.md. */
+export const demandFlavors: Record<DemandType, string> = {
+  demoTomorrow: 'Nothing needs to be production-ready. It just needs to work in production.',
+  visibilityReview: 'Leadership would love more visibility into the visibility.',
+  penTest: 'Nobody panic. Legal is panicking for us.',
+  platformMigration: 'The old platform is deprecated. So is the new one.',
+  ceoCompetitor: 'It’s basically the same product.',
+  oneWeekSprint: 'Same scope. We believe in you.',
+};
+
 /** Each demand's requirement and what missing it costs, in docs/rules.md's words. */
 export const demandRequirements: Record<DemandType, string> = {
-  demoTomorrow: 'Gain at least 5 Progress this sprint.',
-  visibilityReview: '1 Visibility (Status Update).',
-  penTest: '2 Testing (Test Coverage).',
-  platformMigration: '1 Refactoring.',
-  ceoCompetitor: 'None. Target +3 for the rest of the game.',
-  oneWeekSprint: 'None. One contribution is removed at random, unseen, before the reveal.',
+  demoTomorrow: 'Needs at least 5 Progress this sprint.',
+  visibilityReview: 'Needs 1 Visibility (Status Update).',
+  penTest: 'Needs 2 Testing (Test Coverage).',
+  platformMigration: 'Needs 1 Refactoring.',
+  ceoCompetitor: 'No requirement. Target +3 for the rest of the game.',
+  oneWeekSprint:
+    'No requirement. One contribution is removed at random, unseen, before the reveal.',
 };
 
 /** Null for the demands with no requirement. */

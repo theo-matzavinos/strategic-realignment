@@ -11,7 +11,11 @@ import type { PlayerId, Role } from '../src/game/game';
 import type { PlayerView } from '../src/game/view';
 import {
   cardEffects,
+  cardFlavors,
+  cardKinds,
   cardNames,
+  cardRule,
+  cardTags,
   demandNames,
   demandPenalties,
   demandRequirements,
@@ -20,11 +24,14 @@ import {
 import { newPlayerContext } from './access';
 import {
   allowCuttingViewStreams,
+  attendees,
   cutViewStreams,
+  expectNothingClipped,
   fillWhenReady,
   players,
   publicPlayerKeys,
   readViewSnapshot,
+  showDay,
   stringsIn,
   viewKeys,
 } from './room-page';
@@ -68,13 +75,6 @@ type Game = {
   views: PlayerView[];
   /** The one refusal message a page shows right now, by its control; every other page shows none. */
   alert: { playerId: PlayerId; message: string } | null;
-};
-
-const phaseNames: Record<PlayerView['phase'], string> = {
-  lobby: 'Lobby',
-  contribute: 'Contribute',
-  retro: 'Retro',
-  ended: 'Game over',
 };
 
 const games = [
@@ -159,9 +159,7 @@ async function openGame(
   await Promise.all(pages.map((page) => expect(players(page)).toHaveCount(names.length)));
 
   await host.getByRole('button', { name: 'Start the game' }).click();
-  await Promise.all(
-    pages.map((page) => expect(page.getByText('Sprint 1 · Contribute')).toBeVisible()),
-  );
+  await Promise.all(pages.map((page) => expect(attendees(page)).toHaveCount(names.length)));
 
   const sessionIds: string[] = [];
   for (const context of contexts) {
@@ -178,7 +176,9 @@ async function openGame(
   for (let index = 0; index < pages.length; index++) {
     const page = pages[index];
     const role = page.getByRole('region', { name: 'Your role' });
-    await expect(role).toHaveText(/Your role\s*(Management Plant|Delivery Team)/);
+    await expect(role).toHaveText(
+      /^\s*Your role\s*Only you can see this\s*(Management Plant|Delivery Team)\s*$/,
+    );
     let shownRole: Role = 'delivery';
     const roleText = await role.textContent();
     if (roleText?.includes(roleNames.plant)) {
@@ -221,7 +221,7 @@ async function openGame(
   return game;
 }
 
-/** Every player places the first card their page offers; the last placement reveals the sprint. */
+/** Every player books the first card their page offers; the last booking reveals the sprint. */
 async function playContribute(game: Game, sprint: number): Promise<void> {
   const { seats, expected } = game;
   expect(expected.phase).toBe('contribute');
@@ -231,15 +231,19 @@ async function playContribute(game: Game, sprint: number): Promise<void> {
     const seat = seats[index];
     const card = game.views[index].me.hand[0];
 
-    const hand = seat.page.getByRole('region', { name: 'Your hand' });
+    const hand = handOf(seat.page);
     const firstCard = hand.getByRole('radio').first();
-    await expect(firstCard).toHaveAccessibleName(cardLabel(card));
+    await expect(firstCard).toHaveAccessibleName(cardNames[card]);
     await pick(firstCard);
-    const place = hand.getByRole('button', { name: `Place ${cardNames[card]}` });
-    if (sprint === 1 && index === 1) {
-      await checkPageRefusal(game, seat, place);
+    const book = hand.getByRole('button', { name: `Book ${cardNames[card]}` });
+    if (sprint === 1 && index === 0) {
+      await expect(book).toBeVisible();
+      await expectNothingClipped(seat.page);
     }
-    const accepted = await send(seat.page, 'contribute', place);
+    if (sprint === 1 && index === 1) {
+      await checkPageRefusal(game, seat, book);
+    }
+    const accepted = await send(seat.page, 'contribute', book);
     game.alert = null;
 
     expected.version++;
@@ -264,9 +268,9 @@ async function playContribute(game: Game, sprint: number): Promise<void> {
 
 /**
  * A refusal the server really makes, shown on the page: the page's own request is rewritten to
- * place a card that isn't in the hand. The message shows by the Place button, and nothing changes.
+ * book a card that isn't in the hand. The message shows by the Book button, and nothing changes.
  */
-async function checkPageRefusal(game: Game, seat: Seat, place: Locator): Promise<void> {
+async function checkPageRefusal(game: Game, seat: Seat, book: Locator): Promise<void> {
   const index = game.seats.indexOf(seat);
   const notInHand = cardTypes.find((card) => !game.views[index].me.hand.includes(card))!;
   const before = game.views;
@@ -277,20 +281,18 @@ async function checkPageRefusal(game: Game, seat: Seat, place: Locator): Promise
     await route.continue({ postData: JSON.stringify(body) });
   });
   const answered = seat.page.waitForResponse('**/_rpc/room/contribute');
-  await place.click();
+  await book.click();
   const response = await answered;
   await seat.page.unroute('**/_rpc/room/contribute');
   expect(response.status()).toBe(409);
 
   const message = "That card isn't in your hand.";
   game.alert = { playerId: seat.playerId, message };
-  await expect(seat.page.getByRole('region', { name: 'Your hand' }).getByRole('alert')).toHaveText(
-    message,
-  );
+  await expect(handOf(seat.page).getByRole('alert')).toHaveText(message);
   const after = await checkStep(game);
   expect(after).toEqual(before);
   // A refusal re-enables the control at once.
-  await expect(place).toBeEnabled();
+  await expect(book).toBeEnabled();
 }
 
 /** Direct calls the page never makes: the server refuses them with their declared errors. */
@@ -372,12 +374,13 @@ async function playRetro(game: Game, sprint: number): Promise<void> {
 }
 
 async function nominate(game: Game, nominator: Seat, nominee: Seat): Promise<void> {
-  const retro = nominator.page.getByRole('region', { name: 'Retro' });
+  const retro = await showDay(nominator.page, 'Retro');
   await pick(retro.getByRole('radio', { name: nominee.name, exact: true }));
   const button = retro.getByRole('button', { name: `Nominate ${nominee.name} for an audit` });
   // The button names the nominee, which only shows between picking and sending.
   await expect(button).toBeVisible();
   await expectNoSideScroll(nominator.page);
+  await expectNothingClipped(nominator.page);
   const accepted = await send(nominator.page, 'nominate', button);
 
   game.expected.version++;
@@ -389,12 +392,19 @@ async function nominate(game: Game, nominator: Seat, nominee: Seat): Promise<voi
 
 async function castVote(game: Game, seat: Seat, yes: boolean): Promise<void> {
   const { expected, seats } = game;
-  const vote = seat.page.getByRole('region', { name: /^Audit vote on/ });
-  let button = 'Vote no';
-  if (yes) {
-    button = 'Vote yes';
+  const vote = pollOf(await showDay(seat.page, 'Retro'));
+  if (expected.vote!.votes.size === 0) {
+    await expectNothingClipped(seat.page);
   }
-  const accepted = await send(seat.page, 'vote', vote.getByRole('button', { name: button }));
+  let button = 'No';
+  if (yes) {
+    button = 'Yes';
+  }
+  const accepted = await send(
+    seat.page,
+    'vote',
+    vote.getByRole('button', { name: button, exact: true }),
+  );
 
   expected.version++;
   expect(accepted.version).toBe(expected.version);
@@ -427,9 +437,9 @@ async function checkDisabledReady(game: Game, seat: Seat): Promise<void> {
   };
   seat.page.on('request', listener);
 
-  const ready = seat.page
-    .getByRole('region', { name: 'Retro' })
-    .getByRole('button', { name: `Ready for sprint ${game.expected.sprint + 1}` });
+  const ready = (await showDay(seat.page, 'Retro')).getByRole('button', {
+    name: `Ready for sprint ${game.expected.sprint + 1}`,
+  });
   await expect(ready).toBeDisabled();
   await ready.click({ force: true });
   await ready.focus();
@@ -466,8 +476,8 @@ async function castVoteWithLostResponse(game: Game, seat: Seat): Promise<void> {
     await route.abort();
   });
 
-  const vote = page.getByRole('region', { name: /^Audit vote on/ });
-  const yes = vote.getByRole('button', { name: 'Vote yes' });
+  const vote = pollOf(await showDay(page, 'Retro'));
+  const yes = vote.getByRole('button', { name: 'Yes', exact: true });
   const failed = page.waitForEvent('requestfailed', (request) =>
     request.url().endsWith('/_rpc/room/vote'),
   );
@@ -477,6 +487,7 @@ async function castVoteWithLostResponse(game: Game, seat: Seat): Promise<void> {
 
   await expect(vote.getByRole('alert')).toHaveText("Couldn't reach the server. Try again.");
   await expect(yes).toBeEnabled();
+  await expectHeaderFits(page);
 
   const retried = page.waitForResponse('**/_rpc/room/vote');
   await yes.click();
@@ -492,10 +503,11 @@ async function castVoteWithLostResponse(game: Game, seat: Seat): Promise<void> {
 
   await page.getByRole('button', { name: 'Reconnect' }).click();
   await expect(status).toHaveText('Live');
-  await expect(vote).toContainText('Your vote: Yes');
+  await expect(vote).toContainText('You voted Yes.');
 
-  // The refusal's message stays by the vote until the retro ends.
-  game.alert = { playerId: seat.playerId, message };
+  // The vote shows, so the message about it goes; every later step checks it stays gone.
+  await expect(vote.getByRole('alert')).toHaveCount(0);
+  game.alert = null;
   game.expected.version++;
   game.expected.vote!.votes.set(seat.playerId, true);
   await checkStep(game);
@@ -503,7 +515,7 @@ async function castVoteWithLostResponse(game: Game, seat: Seat): Promise<void> {
 
 async function markReady(game: Game, seat: Seat): Promise<void> {
   const { expected, seats } = game;
-  const retro = seat.page.getByRole('region', { name: 'Retro' });
+  const retro = await showDay(seat.page, 'Retro');
   const accepted = await send(
     seat.page,
     'finishRetro',
@@ -545,7 +557,8 @@ async function checkEnd(game: Game): Promise<void> {
     winnerText = 'The Delivery Team wins';
   }
   for (const seat of game.seats) {
-    await expect(seat.page.getByRole('region', { name: 'Result' })).toContainText(winnerText);
+    const board = seat.page.getByRole('region', { name: 'Board' });
+    await expect(board).toContainText(winnerText);
   }
 }
 
@@ -559,6 +572,39 @@ async function expectNoSideScroll(page: Page): Promise<void> {
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBe(0);
+}
+
+/**
+ * The top bar's room code, current sprint, status and Reconnect each show whole, inside the bar,
+ * without overlapping: "Connection lost" and Reconnect are its widest contents.
+ */
+async function expectHeaderFits(page: Page): Promise<void> {
+  const banner = page.getByRole('banner');
+  const parts = [
+    banner.getByRole('heading', { level: 1 }),
+    banner.getByRole('list', { name: 'Sprints' }).locator('[aria-current="step"]'),
+    banner.getByRole('status'),
+    banner.getByRole('button', { name: 'Reconnect' }),
+  ];
+  const bar = (await banner.boundingBox())!;
+  const boxes: { x: number; y: number; width: number; height: number }[] = [];
+  for (const part of parts) {
+    const box = (await part.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(bar.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(bar.x + bar.width);
+    expect(box.y).toBeGreaterThanOrEqual(bar.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(bar.y + bar.height);
+    for (const other of boxes) {
+      const apart =
+        box.x >= other.x + other.width ||
+        other.x >= box.x + box.width ||
+        box.y >= other.y + other.height ||
+        other.y >= box.y + box.height;
+      expect(apart).toBe(true);
+    }
+    boxes.push(box);
+  }
+  await expectNoSideScroll(page);
 }
 
 /** Picks a card or player the way a player does: by clicking its tile, the radio's label. */
@@ -575,7 +621,7 @@ async function send(page: Page, procedure: string, control: Locator): Promise<{ 
   const answered = page.waitForResponse(`**/_rpc/room/${procedure}`);
   await control.click();
   const response = await answered;
-  expect(response.status()).toBe(200);
+  expect(response.status(), `${procedure}: ${await response.text()}`).toBe(200);
 
   const body = await response.json();
   expect(body).toEqual({ version: expect.any(Number) });
@@ -833,30 +879,35 @@ async function checkPage(game: Game, seat: Seat, view: PlayerView): Promise<void
     return playerIds.map(nameOf).join(', ');
   };
 
-  await expect(page.getByText(`Sprint ${view.sprint} · ${phaseNames[view.phase]}`)).toBeVisible();
+  // After the game, the result covers the board: check it first, then go back to the board.
+  if (view.phase === 'ended') {
+    await checkEndInvite(page, view, nameOf);
+  }
+
+  // Where the table is: the sprint, and the day the phase is on.
+  await expect(
+    page.getByRole('list', { name: 'Sprints' }).locator('[aria-current="step"]'),
+  ).toHaveText(`Sprint ${view.sprint} of 4`);
+  await expect(page.locator('[aria-current="date"]:visible')).toHaveText(currentDay(view));
+
   const { board } = view;
   await expect(page.getByRole('region', { name: 'Board' })).toHaveText(
     new RegExp(
-      `Progress\\s*${board.progress}\\s*/\\s*${board.target}\\s*Morale\\s*${board.morale}\\s*` +
-        `Debt\\s*${board.debt}\\s*Audits left\\s*${board.auditsLeft}`,
+      `^\\s*Progress\\s*${board.progress}\\s*/\\s*${board.target} target\\s*Morale\\s*${board.morale}\\s*` +
+        `Debt\\s*${board.debt}\\s*incident at 3\\s*Audits left\\s*${board.auditsLeft}\\s*`,
     ),
   );
 
-  const rows: string[] = [];
+  // Attendees, in seat order: each row holds exactly that player's name, hand size and state tags,
+  // and the tags are tag elements.
+  const rows: RegExp[] = [];
+  const tags: string[] = [];
   for (const player of view.players) {
-    if (view.phase === 'contribute') {
-      rows.push(`${player.handSize} cards · Contributed: ${yesNo(player.hasContributed)}`);
-    }
-    if (view.phase === 'retro') {
-      rows.push(
-        `${player.handSize} cards · Ready: ${yesNo(view.retroReady.includes(player.playerId))}`,
-      );
-    }
-    if (view.phase === 'ended') {
-      rows.push(`${player.handSize} cards · ${roleNames[view.result!.roles[player.playerId]]}`);
-    }
+    rows.push(attendeeRow(view, player));
+    tags.push(...attendeeTags(view, player));
   }
-  await expect(players(page)).toContainText(rows);
+  await expect(attendees(page)).toHaveText(rows);
+  await expect(attendees(page).locator('[data-slot="tag"]')).toHaveText(tags);
 
   await expectNoSideScroll(page);
 
@@ -868,10 +919,11 @@ async function checkPage(game: Game, seat: Seat, view: PlayerView): Promise<void
     await expect(alerts).toHaveCount(0);
   }
 
-  const demand = page.getByRole('region', { name: "This sprint's demand" });
+  // Monday: the demand, and the earlier ones.
+  const demand = await showDay(page, 'Demand');
   if (view.demand !== null) {
     await expect(demand).toContainText(demandNames[view.demand]);
-    await expect(demand).toContainText(`Requirement: ${demandRequirements[view.demand]}`);
+    await expect(demand).toContainText(demandRequirements[view.demand]);
     const penalty = demandPenalties[view.demand];
     if (penalty !== null) {
       await expect(demand).toContainText(`If missed: ${penalty}.`);
@@ -883,74 +935,102 @@ async function checkPage(game: Game, seat: Seat, view: PlayerView): Promise<void
   }
   await expect(demand.getByRole('listitem')).toHaveText(earlier);
 
-  const hand = page.getByRole('region', { name: 'Your hand' });
-  if (view.phase === 'contribute') {
-    const audited = view.players.find((player) => player.isAudited);
-    if (audited?.playerId === seat.playerId) {
-      await expect(hand).toContainText("You're audited this sprint");
-    } else if (audited !== undefined) {
-      await expect(hand).toContainText(`${audited.name} is audited this sprint`);
-    }
+  // Tuesday to Wednesday: one slot per player in seat order, showing only whether they booked.
+  const slots: (string | RegExp)[] = [];
+  for (const player of view.players) {
+    slots.push(slotText(view, player));
+  }
+  await expect((await showDay(page, 'Contribute')).getByRole('listitem')).toHaveText(slots);
 
-    if (view.me.contribution === null) {
-      await expect(hand.getByRole('radio')).toHaveCount(view.me.hand.length);
-      await expect(hand.locator('label')).toHaveText(view.me.hand.map((card) => cardLabel(card)));
-    } else {
-      const waiting = view.players.filter((player) => !player.hasContributed);
-      await expect(hand).toContainText(`Your card this sprint: ${cardNames[view.me.contribution]}`);
-      await expect(hand).toContainText(
-        `Waiting on: ${namesOf(waiting.map((player) => player.playerId))}`,
+  // Your hand, and the booking action.
+  const hand = handOf(page);
+  await expect(hand.getByRole('heading')).toHaveText(
+    new RegExp(`^\\s*Your hand · ${view.me.hand.length} cards`),
+  );
+  if (view.phase === 'contribute' && view.me.contribution === null) {
+    const radios = hand.getByRole('radio');
+    await expect(radios).toHaveCount(view.me.hand.length);
+    for (let index = 0; index < view.me.hand.length; index++) {
+      await expect(radios.nth(index)).toHaveAccessibleName(cardNames[view.me.hand[index]]);
+      // The rule, the Workshop's cost included, is announced with the choice.
+      const card = view.me.hand[index];
+      await expect(radios.nth(index)).toHaveAccessibleDescription(
+        [cardEffects[card], cardTags[card]].filter((part) => part !== null).join(' '),
       );
-      await expect(hand.getByRole('radio')).toHaveCount(0);
+    }
+    // Each choice shows the whole card face, effect and footer included, as the hand does.
+    await expect(hand.locator('label')).toHaveText(view.me.hand.map((card) => cardText(card)));
+    const meAudited = view.players.find((player) => player.playerId === seat.playerId)!.isAudited;
+    if (meAudited) {
+      await expect(hand).toContainText("You're audited this sprint");
+    } else {
+      await expect(hand).not.toContainText("You're audited this sprint");
     }
   } else {
-    await expect(hand.getByRole('listitem')).toHaveText(
-      view.me.hand.map((card) => cardLabel(card)),
+    await expect(hand.getByRole('radio')).toHaveCount(0);
+    await expect(hand.getByRole('listitem')).toHaveText(view.me.hand.map((card) => cardText(card)));
+  }
+  if (view.phase === 'contribute' && view.me.contribution !== null) {
+    const waiting = view.players.filter((player) => !player.hasContributed);
+    await expect(hand).toContainText(
+      `You booked ${cardNames[view.me.contribution]}. Waiting on: ` +
+        `${namesOf(waiting.map((player) => player.playerId))}.`,
     );
   }
 
-  if (view.lastReveal !== null) {
+  // Thursday: the reveal, during the retro and after the game.
+  const review = await showDay(page, 'Sprint Review');
+  const revealed = review.getByRole('list', { name: 'Revealed cards' }).getByRole('listitem');
+  if (view.phase === 'contribute' || view.lastReveal === null) {
+    await expect(revealed).toHaveCount(0);
+  } else {
     const { lastReveal } = view;
-    const reveal = page.getByRole('region', { name: `Sprint ${lastReveal.sprint} reveal` });
-    // The revealed cards in the payload's order, with yours marked on the tile the payload says.
-    const tiles: RegExp[] = [];
+    // One row per card in the payload's order, yours marked on the row the payload says, then the
+    // audited card, attributed, and the removed one.
+    const expectedRows: string[] = [];
     for (let index = 0; index < lastReveal.cards.length; index++) {
-      tiles.push(cardLabel(lastReveal.cards[index], index === lastReveal.mine));
+      const card = lastReveal.cards[index];
+      if (index === lastReveal.mine) {
+        expectedRows.push(`${cardNames[card]} You · ${cardRule(card)}`);
+      } else {
+        expectedRows.push(`${cardNames[card]} ${cardRule(card)}`);
+      }
     }
-    await expect(
-      reveal.getByRole('list', { name: 'Revealed cards' }).getByRole('listitem'),
-    ).toHaveText(tiles);
+    if (lastReveal.audited !== null) {
+      const { card, playerId } = lastReveal.audited;
+      expectedRows.push(`${cardNames[card]} ${nameOf(playerId)} · audited · ${cardRule(card)}`);
+    }
+    if (lastReveal.oneRemoved) {
+      expectedRows.push('1 removed, unseen');
+    }
+    await expect(revealed).toHaveText(expectedRows);
+    // Every revealed or audited Workshop shows its cost, whoever holds one.
+    const workshops = revealed.filter({ hasText: cardNames.workshop });
+    await expect(workshops.filter({ hasNotText: 'Other cards −2 Progress' })).toHaveCount(0);
     let marked = 1;
     if (lastReveal.mine === null) {
       marked = 0;
     }
-    await expect(reveal.getByText('(yours)')).toHaveCount(marked);
+    await expect(review.getByText(/^\s*You · /)).toHaveCount(marked);
+
     const { outcome } = lastReveal;
-    let demandOutcome: RegExp = /^No requirement\.$/;
+    let demandOutcome: RegExp = /^\s*No requirement\s*$/;
     if (outcome.demandMet === true) {
-      demandOutcome = /^Met\.$/;
+      demandOutcome = /^\s*Met\s*$/;
     }
     if (outcome.demandMet === false) {
-      demandOutcome = /^Missed: (−1 Morale|\+2 Debt)\.$/;
+      demandOutcome = /^\s*Missed: (−1 Morale|\+2 Debt)\s*$/;
     }
-    let incident = 'None.';
+    let incident = 'None';
     if (outcome.incident) {
-      incident = 'Yes: Debt reached 3, so −5 Progress and −3 Debt.';
+      incident = '−5 Progress, −3 Debt';
     }
-    await expect(reveal.getByRole('definition')).toHaveText([
+    await expect(review.getByRole('definition')).toHaveText([
       `+${outcome.progress}`,
       demandOutcome,
       incident,
     ]);
-    if (lastReveal.audited !== null) {
-      const { card } = lastReveal.audited;
-      await expect(reveal).toContainText(
-        `Audited, face up: ${nameOf(lastReveal.audited.playerId)} played ${cardNames[card]} (${cardEffects[card]}).`,
-      );
-    }
-    if (lastReveal.oneRemoved) {
-      await expect(reveal).toContainText('One card was removed unseen.');
-    }
+
     // Only the removed card's owner: no revealed card is theirs, and they weren't audited.
     const ownerLine = 'Your card was the one removed: none of the revealed cards is yours.';
     const removedWasMine =
@@ -958,41 +1038,46 @@ async function checkPage(game: Game, seat: Seat, view: PlayerView): Promise<void
       lastReveal.mine === null &&
       lastReveal.audited?.playerId !== seat.playerId;
     if (removedWasMine) {
-      await expect(reveal).toContainText(ownerLine);
+      await expect(review).toContainText(ownerLine);
     } else {
-      await expect(reveal).not.toContainText(ownerLine);
+      await expect(review).not.toContainText(ownerLine);
     }
   }
 
+  // Friday: the retro.
   if (view.phase === 'retro') {
-    const retro = page.getByRole('region', { name: 'Retro' });
+    const retro = await showDay(page, 'Retro');
     const { vote } = view;
 
     if (vote === null) {
       await expect(retro.getByRole('button', { name: /^Nominate/ })).toBeVisible();
     } else {
-      const panel = retro.getByRole('region', { name: `Audit vote on ${nameOf(vote.nominee)}` });
+      const poll = retro.getByRole('region', { name: `Audit ${nameOf(vote.nominee)}?` });
+      await expect(poll).toContainText(
+        `Yes needs more than half: ${Math.floor(view.players.length / 2) + 1} of ${view.players.length}.`,
+      );
       if (vote.outcome === null) {
-        await expect(panel).toContainText(
-          `Voted so far (${vote.voted.length} of ${view.players.length}): ${namesOf(vote.voted)}`,
+        await expect(poll).toContainText(
+          `${vote.voted.length} of ${view.players.length} have voted. Votes show once everyone is in.`,
         );
       } else {
         let outcome = 'The audit failed.';
         if (vote.outcome.passed) {
           outcome = 'The audit passed.';
         }
-        await expect(panel).toContainText(outcome);
-        await expect(panel).toContainText(`Yes: ${namesOf(vote.outcome.yes)}`);
-        await expect(panel).toContainText(`No: ${namesOf(vote.outcome.no)}`);
+        await expect(poll).toContainText(outcome);
+        await expect(poll).toContainText(`Yes: ${namesOf(vote.outcome.yes)}`);
+        await expect(poll).toContainText(`No: ${namesOf(vote.outcome.no)}`);
       }
       if (vote.mine === null) {
-        await expect(panel.getByRole('button', { name: 'Vote yes' })).toBeEnabled();
+        await expect(poll.getByRole('button', { name: 'Yes', exact: true })).toBeEnabled();
       } else {
         let mine = 'No';
         if (vote.mine) {
           mine = 'Yes';
         }
-        await expect(panel).toContainText(`Your vote: ${mine}`);
+        await expect(poll).toContainText(`You voted ${mine}.`);
+        await expect(poll.getByRole('button')).toHaveCount(0);
       }
     }
 
@@ -1001,12 +1086,6 @@ async function checkPage(game: Game, seat: Seat, view: PlayerView): Promise<void
       await expect(retro).toContainText(`${audited.name} plays face up next sprint.`);
     }
 
-    const waiting = view.players
-      .filter((player) => !view.retroReady.includes(player.playerId))
-      .map((player) => player.playerId);
-    await expect(retro).toContainText(
-      `Ready: ${namesOf(view.retroReady)}. Waiting on: ${namesOf(waiting)}.`,
-    );
     if (view.retroReady.includes(seat.playerId)) {
       await expect(retro).toContainText("You're ready.");
     } else {
@@ -1021,33 +1100,205 @@ async function checkPage(game: Game, seat: Seat, view: PlayerView): Promise<void
   }
 
   if (view.phase === 'ended') {
-    const result = page.getByRole('region', { name: 'Result' });
-    const roles: RegExp[] = [];
-    for (const player of view.players) {
-      const role = roleNames[view.result!.roles[player.playerId]];
-      roles.push(new RegExp(`^${player.name}\\s*(\\(you\\))?\\s*${role}$`));
+    const retro = await showDay(page, 'Retro');
+    if (view.vote === null) {
+      await expect(retro).toContainText('No retro: the game is over.');
+    } else {
+      await expect(retro).toContainText('The game ended on this audit: Morale reached 0.');
     }
-    await expect(result.getByRole('listitem')).toHaveText(roles);
   }
 }
 
-/** A card tile's text: its name, `(yours)` when marked, and what it does. */
-function cardLabel(card: CardType, mine = false): RegExp {
-  let marker = '';
-  if (mine) {
-    marker = '\\s*\\(yours\\)';
+/**
+ * The end-of-game invite: it opens by itself, or from "Show result" once closed. It names the
+ * winner and every role, then "Back to the board" closes it.
+ */
+async function checkEndInvite(
+  page: Page,
+  view: PlayerView,
+  nameOf: (playerId: PlayerId) => string,
+): Promise<void> {
+  const result = view.result!;
+  let title = 'Strategic Realignment: an exciting new chapter';
+  let winner = 'the Management Plant wins.';
+  if (result.winner === 'delivery') {
+    title = 'Q3 Platform Excellence has shipped';
+    winner = 'the Delivery Team wins.';
   }
 
-  return new RegExp(`^${escaped(cardNames[card])}${marker}\\s*${escaped(cardEffects[card])}$`);
+  const invite = page.getByRole('dialog', { name: title });
+  if (!(await invite.isVisible())) {
+    await page
+      .getByRole('region', { name: 'Board' })
+      .getByRole('button', { name: 'Show result' })
+      .click();
+  }
+  await expect(invite).toBeVisible();
+  await expect(invite).toContainText(`Result: ${winner}`);
+
+  const roles: RegExp[] = [];
+  for (const player of view.players) {
+    const name = nameOf(player.playerId);
+    const role = roleNames[result.roles[player.playerId]];
+    roles.push(
+      new RegExp(
+        `^\\s*${escaped(Array.from(name)[0])}\\s*${escaped(name)}\\s*(\\(you\\))?\\s*${role}\\s*$`,
+      ),
+    );
+  }
+  await expect(invite.getByRole('list', { name: 'Roles' }).getByRole('listitem')).toHaveText(roles);
+  await expect(invite.getByRole('link', { name: 'New room' })).toHaveAttribute('href', '/');
+  await expectInviteScrolls(page, invite);
+
+  await invite.getByRole('button', { name: 'Back to the board' }).click();
+  await expect(invite).toBeHidden();
+}
+
+/**
+ * On a short screen, portrait or landscape, the invite opens at its title and a wheel scroll reaches
+ * its footer: the invite scrolls itself rather than clipping. The viewport is restored afterwards.
+ */
+async function expectInviteScrolls(page: Page, invite: Locator): Promise<void> {
+  const original = page.viewportSize()!;
+  const footer = invite.getByRole('button', { name: 'Back to the board' });
+  for (const size of [
+    { width: 390, height: 568 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(size);
+    await invite.evaluate((dialog) => dialog.scrollTo(0, 0));
+    await expect(invite.getByRole('heading', { level: 2 })).toBeInViewport();
+    expect(await invite.evaluate((dialog) => dialog.scrollHeight > dialog.clientHeight)).toBe(true);
+    await invite.hover({ position: { x: 20, y: 20 } });
+    await page.mouse.wheel(0, 3000);
+    await expect(footer).toBeInViewport();
+  }
+  await page.setViewportSize(original);
+}
+
+/** The day the phase is on: booking on Tue–Wed, the reveal on Thursday, a vote on Friday. */
+function currentDay(view: PlayerView): RegExp {
+  if (view.phase === 'contribute') {
+    return /^\s*Tue–Wed\s*Contribute\s*$/;
+  }
+  if (view.vote === null) {
+    return /^\s*Thu\s*Sprint Review\s*$/;
+  }
+  return /^\s*Fri\s*Retro\s*$/;
+}
+
+/** An attendee row: initial, name, "(you)", "host", hand size, then exactly its state tags. */
+function attendeeRow(view: PlayerView, player: PlayerView['players'][number]): RegExp {
+  let you = '';
+  if (player.playerId === view.me.playerId) {
+    you = '\\s*\\(you\\)';
+  }
+  let host = '';
+  if (player.isHost) {
+    host = '\\s*host ·';
+  }
+  const initial = Array.from(player.name)[0].toUpperCase();
+  const tags = attendeeTags(view, player).map(escaped).join('\\s*');
+
+  return new RegExp(
+    `^\\s*${escaped(initial)}\\s*${escaped(player.name)}${you}${host}\\s*` +
+      `${player.handSize} cards\\s*${tags}\\s*$`,
+  );
+}
+
+/** An attendee's public state tags in this phase. */
+function attendeeTags(view: PlayerView, player: PlayerView['players'][number]): string[] {
+  const tags: string[] = [];
+  if (view.phase === 'contribute') {
+    if (player.hasContributed) {
+      tags.push('Booked');
+    } else {
+      tags.push('Not booked');
+    }
+  }
+  if (view.phase === 'retro') {
+    const { vote } = view;
+    const voteOpen = vote !== null && vote.outcome === null;
+    if (voteOpen && vote.nominee === player.playerId) {
+      tags.push('Nominee');
+    }
+    if (voteOpen && vote.voted.includes(player.playerId)) {
+      tags.push('Voted');
+    } else if (voteOpen) {
+      tags.push('Voting…');
+    } else if (view.retroReady.includes(player.playerId)) {
+      tags.push('Ready');
+    } else {
+      tags.push('Not ready');
+    }
+  }
+  if (view.phase === 'ended') {
+    tags.push(roleNames[view.result!.roles[player.playerId]]);
+  }
+  if (player.isAudited) {
+    tags.push('Audited');
+  }
+  return tags;
+}
+
+/** A Tue–Wed slot: "Busy" or "Open" for others, the audited player named, your own card once booked. */
+function slotText(view: PlayerView, player: PlayerView['players'][number]): string | RegExp {
+  if (view.phase !== 'contribute') {
+    return 'Busy';
+  }
+
+  if (player.playerId === view.me.playerId) {
+    const card = view.me.contribution;
+    if (card === null && player.isAudited) {
+      return 'Your slot · audited, books face up';
+    }
+    if (card === null) {
+      return 'Your slot';
+    }
+    let audited = '';
+    if (player.isAudited) {
+      audited = '\\s*· audited, face up';
+    }
+    return new RegExp(
+      `^\\s*Your slot${audited}\\s*${escaped(cardNames[card])}\\s*${escaped(cardEffects[card])}\\s*$`,
+    );
+  }
+
+  if (player.isAudited && player.hasContributed) {
+    return `${player.name} · audited, booked face up`;
+  }
+  if (player.isAudited) {
+    return `${player.name} · audited, books face up`;
+  }
+  if (player.hasContributed) {
+    return 'Busy · private';
+  }
+  return 'Open';
+}
+
+/** The tray's hand region, named for the cards it holds. */
+function handOf(page: Page): Locator {
+  return page.getByRole('region', { name: /^Your hand · \d+ cards/ });
+}
+
+/** The audit poll in the retro's lane. */
+function pollOf(retro: Locator): Locator {
+  return retro.getByRole('region', { name: /^Audit .+\?$/ });
+}
+
+/** A card's face: its band, name, effect, flavor line and footer tag. */
+function cardText(card: CardType): RegExp {
+  let tag = '';
+  if (cardTags[card] !== null) {
+    tag = `\\s*${escaped(cardTags[card])}`;
+  }
+
+  return new RegExp(
+    `^\\s*${escaped(cardKinds[card])}\\s*Contribution\\s*${escaped(cardNames[card])}\\s*` +
+      `${escaped(cardEffects[card])}\\s*“${escaped(cardFlavors[card])}”${tag}\\s*$`,
+  );
 }
 
 function escaped(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function yesNo(value: boolean): string {
-  if (value) {
-    return 'yes';
-  }
-  return 'no';
 }
