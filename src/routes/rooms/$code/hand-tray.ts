@@ -10,6 +10,7 @@ import {
   cardKinds,
   cardNames,
   cardTags,
+  playerName,
   playerNames,
   roleNames,
 } from './display-names';
@@ -18,9 +19,10 @@ import { RoomRequest } from './room-request';
 import { injectRpc } from './rpc.generated';
 
 /**
- * The hand tray along the bottom: your role in a private box, styled the same for both roles; your
- * hand as cards; and the phase's action. While the team contributes you pick a card and book it,
- * as two steps, since a booked card is final. Otherwise the hand is display-only.
+ * The hand tray along the bottom: your role in a private box, styled the same for both roles, which
+ * names the other Plant to a Plant in a two-Plant game; your hand as cards; and the phase's action.
+ * While the team contributes you pick a card and book it, as two steps, since a booked card is
+ * final. Otherwise the hand is display-only.
  */
 @Component({
   selector: 'app-hand-tray',
@@ -37,7 +39,7 @@ import { injectRpc } from './rpc.generated';
           Your role
         </h2>
         <div
-          class="grid gap-1 rounded-surface border border-dashed border-line p-3 max-desk:flex max-desk:items-center max-desk:gap-2 max-desk:self-start max-desk:rounded-full max-desk:px-2.5 max-desk:py-1.5"
+          class="grid gap-1 rounded-surface border border-dashed border-line p-3 max-desk:flex max-desk:flex-wrap max-desk:items-center max-desk:gap-x-2 max-desk:gap-y-0.5 max-desk:self-start max-desk:rounded-[20px] max-desk:px-2.5 max-desk:py-1.5"
         >
           <p class="flex items-center gap-1.5 text-[12px] text-fg-muted">
             <svg lucideLock class="shrink-0 size-3.5"></svg>
@@ -45,6 +47,13 @@ import { injectRpc } from './rpc.generated';
           </p>
           @if (room().me.role; as role) {
             <p class="text-[17px] font-bold max-desk:text-[14px]">{{ roleNames[role] }}</p>
+          }
+          <!-- Only a Plant in a two-Plant game (8–10 players) knows the other. -->
+          @if (room().me.otherPlant; as otherPlant) {
+            <p class="min-w-0 text-[13px] text-fg-muted wrap-anywhere max-desk:text-[12px]">
+              The other Plant:
+              <strong class="font-semibold text-fg">{{ playerName(room(), otherPlant) }}</strong>
+            </p>
           }
         </div>
       </section>
@@ -169,6 +178,7 @@ export class HandTray {
   readonly #moments = inject(Moments);
   protected readonly request = new RoomRequest(this.room);
   protected readonly roleNames = roleNames;
+  protected readonly playerName = playerName;
   protected readonly cardNames = cardNames;
   protected readonly cardEffects = cardEffects;
   protected readonly cardFlavors = cardFlavors;

@@ -18,11 +18,12 @@ How this project goes from idea to a game the team plays, and how each step is d
 
 Each slice is one small, complete piece of work with an observable done check.
 
-| #   | Slice            | Done check                                                                                                | Verification                              |
-| --- | ---------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| 1   | Design baseline  | A paper playtest can run from the rules alone; every hidden item maps to one view field                   | [01](verification/01-design-baseline.md)  |
-| 2   | Walking skeleton | Create a room, join from several browsers, see players arrive and one action sync through the view stream | [02](verification/02-walking-skeleton.md) |
-| 3   | First playable   | A full game of rules v0 in the deployed app, each player seeing only their own view at every step         | [03](verification/03-first-playable.md)   |
+| #   | Slice            | Done check                                                                                                                                               | Verification                              |
+| --- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| 1   | Design baseline  | A paper playtest can run from the rules alone; every hidden item maps to one view field                                                                  | [01](verification/01-design-baseline.md)  |
+| 2   | Walking skeleton | Create a room, join from several browsers, see players arrive and one action sync through the view stream                                                | [02](verification/02-walking-skeleton.md) |
+| 3   | First playable   | A full game of rules v0 in the deployed app, each player seeing only their own view at every step                                                        | [03](verification/03-first-playable.md)   |
+| 4   | Ten players      | A full game of 10 players in the app; each Plant sees the other Plant and nobody else does; 5–7-player games recorded before the change replay unchanged | [04](verification/04-ten-players.md)      |
 
 ## How each slice is documented
 

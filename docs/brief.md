@@ -12,7 +12,7 @@ The project has two goals of equal weight:
 | Question         | Answer                                                                                |
 | ---------------- | ------------------------------------------------------------------------------------- |
 | Purpose          | Fun and learning. A team game, not a product.                                         |
-| Players          | 5–7 colleagues per game, each on their own device.                                    |
+| Players          | 5–10 colleagues per game, each on their own device.                                   |
 | Where            | Remote or in person, with everyone talking on their usual call. The game has no chat. |
 | Devices          | Desktop browsers first. Phones should work but aren't a first target. _(assumption)_  |
 | Session length   | One game in roughly 20–30 minutes, to be measured in playtests. _(assumption)_        |

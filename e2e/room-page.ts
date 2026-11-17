@@ -190,8 +190,8 @@ const middleWidths = [721, 800, 1024, 1279];
  * No text or control on the page is cut off: no text runs past an ancestor that hides overflow (or
  * past the screen, outside a sideways scroller), and no button's or label's content is wider than
  * it. On the day view it checks each day's lane, then returns to the day that was shown; outside a
- * game it checks the page as it is. From a desktop width it also checks the widths in between, then
- * restores the window.
+ * game, or under an open dialog, it checks the page as it is. From a desktop width it also checks
+ * the widths in between, then restores the window.
  */
 export async function expectNothingClipped(page: Page): Promise<void> {
   const viewport = page.viewportSize()!;
@@ -203,8 +203,9 @@ export async function expectNothingClipped(page: Page): Promise<void> {
   for (const width of widths) {
     await page.setViewportSize({ width, height: viewport.height });
     const tabs = page.getByRole('group', { name: 'Days' });
-    // Outside a game, such as the lobby or the waiting room, there's no day view to step through.
-    const hasDays = (await tabs.count()) > 0;
+    // Outside a game, such as the lobby or the waiting room, there's no day view to step through;
+    // under an open dialog, such as the end invite, the day tabs can't be pressed.
+    const hasDays = (await tabs.count()) > 0 && (await page.locator('dialog[open]').count()) === 0;
     if (!isPhone(page) || !hasDays) {
       expect(await page.evaluate(findClipping), `at ${width} px`).toEqual([]);
       continue;

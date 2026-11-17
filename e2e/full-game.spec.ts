@@ -7,7 +7,7 @@ import {
   type Request,
 } from '@playwright/test';
 import { cardTypes, type CardType } from '../src/game/cards';
-import type { PlayerId, Role } from '../src/game/game';
+import { plantCount, type PlayerId, type Role } from '../src/game/game';
 import type { PlayerView } from '../src/game/view';
 import {
   cardEffects,
@@ -40,6 +40,7 @@ const shortNames = ['Ana', 'Ben', 'Chloe', 'Dimitri', 'Eleni'];
 /** The longest name a player can take, which the 7-player game plays at phone width. */
 const longName = 'WWWWWWWWWWWWWWWWWWWW';
 const sevenNames = ['Ana', 'Ben', longName, 'Dimitri', 'Eleni', 'Fotis', 'Giorgos'];
+const tenNames = [...shortNames, 'Fotis', 'Giorgos', 'Hara', 'Ilias', 'Katerina'];
 const phoneWidth = 390;
 
 type Seat = {
@@ -80,6 +81,7 @@ type Game = {
 const games = [
   { names: shortNames, width: null, timeout: 360_000 },
   { names: sevenNames, width: phoneWidth, timeout: 720_000 },
+  { names: tenNames, width: null, timeout: 2_400_000 },
 ];
 
 for (const { names, width, timeout } of games) {
@@ -95,6 +97,8 @@ for (const { names, width, timeout } of games) {
     // Every step reads every player's stream and checks every page. Locally that's about 30 s for
     // 5 players and 2 minutes for 7 (up to 4.5 on a loaded machine), since each snapshot's stream
     // lingers on workerd for ~30 s; the timeouts leave room for a slower machine or a deployment.
+    // 10 players: two Plants, each of whom sees the other; 12 minutes locally, 17 on a loaded
+    // machine, since the calendar table's page checks are heavier than the old panels'.
     test.setTimeout(timeout);
     const contexts: BrowserContext[] = [];
     const pageErrors: string[] = [];
@@ -161,6 +165,9 @@ async function openGame(
   }
   await Promise.all(pages.map((page) => expect(players(page)).toHaveCount(names.length)));
   await expectNothingClipped(guests.at(-1)!);
+  if (names.length > 7) {
+    await expectFitsPhone(guests.at(-1)!);
+  }
 
   await host.getByRole('button', { name: 'Start sprint 1' }).click();
   await Promise.all(pages.map((page) => expect(attendees(page)).toHaveCount(names.length)));
@@ -175,13 +182,14 @@ async function openGame(
   }
   expect(sessionIds).toHaveLength(names.length);
 
-  // Each page shows its own role; its stream says the same. Exactly one is the Plant.
+  // Each page shows its own role; its stream says the same. One Plant, or two with 8–10 players.
   const seats: Seat[] = [];
   for (let index = 0; index < pages.length; index++) {
     const page = pages[index];
     const role = page.getByRole('region', { name: 'Your role' });
+    // checkPage pins the other Plant's name by value at every step.
     await expect(role).toHaveText(
-      /^\s*Your role\s*Only you can see this\s*(Management Plant|Delivery Team)\s*$/,
+      /^\s*Your role\s*Only you can see this\s*(Management Plant|Delivery Team)(\s*The other Plant:\s*\S[\s\S]*)?\s*$/,
     );
     let shownRole: Role = 'delivery';
     const roleText = await role.textContent();
@@ -199,7 +207,7 @@ async function openGame(
       role: shownRole,
     });
   }
-  expect(seats.filter((seat) => seat.role === 'plant')).toHaveLength(1);
+  expect(seats.filter((seat) => seat.role === 'plant')).toHaveLength(plantCount(names.length));
 
   const game: Game = {
     code,
@@ -243,6 +251,10 @@ async function playContribute(game: Game, sprint: number): Promise<void> {
     if (sprint === 1 && index === 0) {
       await expect(book).toBeVisible();
       await expectNothingClipped(seat.page);
+      // A Plant's page with every seat, its role box naming the other Plant.
+      if (seats.length > 7) {
+        await expectFitsPhone(seats.find((other) => other.role === 'plant')!.page);
+      }
     }
     if (sprint === 1 && index === 1) {
       await checkPageRefusal(game, seat, book);
@@ -543,7 +555,12 @@ async function markReady(game: Game, seat: Seat): Promise<void> {
 /** The game always reaches the end of sprint 4, and every page shows the same result. */
 async function checkEnd(game: Game): Promise<void> {
   const views = await checkStep(game);
-  const plant = game.seats.find((seat) => seat.role === 'plant')!;
+  const plants: [PlayerId, Role][] = [];
+  for (const seat of game.seats) {
+    if (seat.role === 'plant') {
+      plants.push([seat.playerId, 'plant']);
+    }
+  }
 
   for (const view of views) {
     expect(view.phase).toBe('ended');
@@ -552,11 +569,14 @@ async function checkEnd(game: Game): Promise<void> {
     expect(view.board.morale).toBeGreaterThanOrEqual(1);
     expect(view.result).toEqual(views[0].result);
 
-    const plants = Object.entries(view.result!.roles).filter(([, role]) => role === 'plant');
-    expect(plants).toEqual([[plant.playerId, 'plant']]);
+    const shownPlants = Object.entries(view.result!.roles).filter(([, role]) => role === 'plant');
+    expect(shownPlants).toEqual(plants);
   }
 
   let winnerText = 'The Management Plant wins';
+  if (plants.length === 2) {
+    winnerText = 'The Management Plants win';
+  }
   if (views[0].result!.winner === 'delivery') {
     winnerText = 'The Delivery Team wins';
   }
@@ -564,6 +584,40 @@ async function checkEnd(game: Game): Promise<void> {
     const board = seat.page.getByRole('region', { name: 'Board' });
     await expect(board).toContainText(winnerText);
   }
+
+  // Every seat's role fits on a phone too, in the invite and on the final board.
+  if (game.seats.length > 7) {
+    const { page } = game.seats[0];
+    const original = page.viewportSize()!;
+    await page.setViewportSize({ width: phoneWidth, height: 844 });
+    await page
+      .getByRole('region', { name: 'Board' })
+      .getByRole('button', { name: 'Show result' })
+      .click();
+    const invite = page.getByRole('dialog');
+    await expect(invite.getByRole('list', { name: 'Roles' }).getByRole('listitem')).toHaveCount(
+      game.seats.length,
+    );
+    await expectNothingClipped(page);
+    await expectNoSideScroll(page);
+    await invite.getByRole('button', { name: 'Back to the board' }).click();
+    await expect(invite).toBeHidden();
+    await expectNothingClipped(page);
+    await expectNoSideScroll(page);
+    await page.setViewportSize(original);
+  }
+}
+
+/**
+ * The 10-player game plays at desktop width; this checks a page of it at phone size too, where every
+ * seat must still fit: nothing clipped and no sideways scroll. The viewport is restored afterwards.
+ */
+async function expectFitsPhone(page: Page): Promise<void> {
+  const original = page.viewportSize()!;
+  await page.setViewportSize({ width: phoneWidth, height: 844 });
+  await expectNothingClipped(page);
+  await expectNoSideScroll(page);
+  await page.setViewportSize(original);
 }
 
 /** At phone width nothing, however long, scrolls the page sideways. */
@@ -688,7 +742,13 @@ function checkView(game: Game, seat: Seat, raw: Record<string, unknown>): Player
   // Exactly the PlayerView fields, at every level.
   expect(Object.keys(raw).sort()).toEqual(viewKeys);
   const view = raw as PlayerView;
-  expect(Object.keys(view.me).sort()).toEqual(['contribution', 'hand', 'playerId', 'role']);
+  expect(Object.keys(view.me).sort()).toEqual([
+    'contribution',
+    'hand',
+    'otherPlant',
+    'playerId',
+    'role',
+  ]);
   expect(Object.keys(view.board).sort()).toEqual([
     'auditsLeft',
     'debt',
@@ -716,6 +776,7 @@ function checkView(game: Game, seat: Seat, raw: Record<string, unknown>): Player
   // Me.
   expect(view.me.playerId).toBe(seat.playerId);
   expect(view.me.role).toBe(seat.role);
+  expect(view.me.otherPlant).toBe(otherPlantOf(game, seat));
   let contribution: CardType | null = null;
   if (expected.phase === 'contribute') {
     contribution = expected.placed.get(seat.playerId) ?? null;
@@ -770,6 +831,21 @@ function checkView(game: Game, seat: Seat, raw: Record<string, unknown>): Player
   }
 
   return view;
+}
+
+/** The other Plant, by what every page showed at the start: only a Plant in a two-Plant game. */
+function otherPlantOf(game: Game, seat: Seat): PlayerId | null {
+  if (seat.role !== 'plant') {
+    return null;
+  }
+
+  for (const other of game.seats) {
+    if (other !== seat && other.role === 'plant') {
+      return other.playerId;
+    }
+  }
+
+  return null;
 }
 
 /** The reveal holds exactly the placed cards, minus the audited and any removed one. */
@@ -893,6 +969,22 @@ async function checkPage(game: Game, seat: Seat, view: PlayerView): Promise<void
     page.getByRole('list', { name: 'Sprints' }).locator('[aria-current="step"]'),
   ).toHaveText(`Sprint ${view.sprint} of 4`);
   await expect(page.locator('[aria-current="date"]:visible')).toHaveText(currentDay(view));
+
+  // Your role box holds exactly your role, and names the other Plant only to a Plant in a two-Plant
+  // game.
+  const role = page.getByRole('region', { name: 'Your role' });
+  let otherPlantLine = '';
+  if (view.me.otherPlant === null) {
+    await expect(role).not.toContainText('other Plant');
+  } else {
+    await expect(role).toContainText(`The other Plant: ${nameOf(view.me.otherPlant)}`);
+    otherPlantLine = `\\s*The other Plant:\\s*${escaped(nameOf(view.me.otherPlant))}`;
+  }
+  await expect(role).toHaveText(
+    new RegExp(
+      `^\\s*Your role\\s*Only you can see this\\s*${roleNames[seat.role]}${otherPlantLine}\\s*$`,
+    ),
+  );
 
   const { board } = view;
   await expect(page.getByRole('region', { name: 'Board' })).toHaveText(
@@ -1123,8 +1215,17 @@ async function checkEndInvite(
   nameOf: (playerId: PlayerId) => string,
 ): Promise<void> {
   const result = view.result!;
+  let plants = 0;
+  for (const role of Object.values(result.roles)) {
+    if (role === 'plant') {
+      plants++;
+    }
+  }
   let title = 'Strategic Realignment: an exciting new chapter';
   let winner = 'the Management Plant wins.';
+  if (plants === 2) {
+    winner = 'the Management Plants win.';
+  }
   if (result.winner === 'delivery') {
     title = 'Q3 Platform Excellence has shipped';
     winner = 'the Delivery Team wins.';

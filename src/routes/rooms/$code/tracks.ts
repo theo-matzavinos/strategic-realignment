@@ -1,7 +1,7 @@
 import { Component, computed, inject, input, output } from '@angular/core';
 import { Button } from '#ui/button';
 import type { PlayerView } from '../../../game/view';
-import { playerName } from './display-names';
+import { playerName, winnerPhrase } from './display-names';
 import { Moments } from './moments';
 
 /** Morale starts at 4 and never rises (docs/rules.md, Components). */
@@ -181,11 +181,11 @@ export class Tracks {
         return `Retro: ready for sprint ${room.sprint + 1}?`;
       }
       case 'ended': {
-        if (room.result?.winner === 'delivery') {
-          return 'The Delivery Team wins';
+        if (room.result === null) {
+          throw new Error('An ended game has a result');
         }
 
-        return 'The Management Plant wins';
+        return `The ${winnerPhrase(room.result)}`;
       }
     }
   });

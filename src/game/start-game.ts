@@ -5,6 +5,7 @@ import {
   handSize,
   maxPlayers,
   minPlayers,
+  plantCount,
   startingBoard,
   startingTarget,
   type ContributeGame,
@@ -36,7 +37,7 @@ export function startGame(
   }
 
   if (game.players.length > maxPlayers) {
-    // addPlayer never seats an 8th player, so this is a corrupted game, not a refused action.
+    // addPlayer never seats more than maxPlayers, so this is a corrupted game, not a refused action.
     throw new Error(`A lobby can't hold ${game.players.length} players`);
   }
 
@@ -47,13 +48,18 @@ export function startGame(
 function setUp(game: LobbyGame, logged: { playerId: PlayerId; action: Action }): ContributeGame {
   const playerCount = game.players.length;
 
-  const roleCards: Role[] = ['plant'];
-  for (let index = 1; index < playerCount; index++) {
-    roleCards.push('delivery');
+  const plants = plantCount(playerCount);
+  const roleCards: Role[] = [];
+  for (let index = 0; index < playerCount; index++) {
+    if (index < plants) {
+      roleCards.push('plant');
+    } else {
+      roleCards.push('delivery');
+    }
   }
   const shuffledRoles = shuffle(roleCards, game.random);
 
-  const shuffledDeck = shuffle(contributionDeck(), shuffledRoles.state);
+  const shuffledDeck = shuffle(contributionDeck(playerCount), shuffledRoles.state);
   const deck = shuffledDeck.items;
 
   const shuffledDemands = shuffle(demandDeck, shuffledDeck.state);

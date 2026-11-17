@@ -25,6 +25,7 @@ export type PlayerView = {
     role: 'plant' | 'delivery' | null; // null in the lobby
     hand: CardType[];
     contribution: CardType | null; // this sprint, until the reveal
+    otherPlant: PlayerId | null; // the other Plant, only in a Plant's view in a two-Plant game
   };
   players: {
     playerId: PlayerId;
@@ -59,7 +60,8 @@ export type PlayerView = {
 /**
  * Builds one player's view of a room, holding only what the rules let that player see
  * (docs/rules.md, Who sees what). Every field is copied explicitly; nothing is spread from the room
- * or the game, so hidden or server-only state can't leak by accident.
+ * or the game, so hidden or server-only state can't leak by accident. With two Plants (8–10
+ * players), each Plant's view names the other in `me.otherPlant`; it's null in every other view.
  */
 export function viewFor(room: Room, playerId: PlayerId): PlayerView {
   const { game } = room;
@@ -77,6 +79,7 @@ export function viewFor(room: Room, playerId: PlayerId): PlayerView {
   let role: Role | null = null;
   let hand: CardType[] = [];
   let contribution: CardType | null = null;
+  let otherPlant: PlayerId | null = null;
   const handSizes: Record<PlayerId, number> = {};
   const contributed = new Set<PlayerId>();
   let audited: PlayerId | null = null;
@@ -96,6 +99,13 @@ export function viewFor(room: Room, playerId: PlayerId): PlayerView {
       pastDemands.push(game.demands[index]);
     }
     role = game.roles[playerId];
+    if (role === 'plant') {
+      for (const player of game.players) {
+        if (player !== playerId && game.roles[player] === 'plant') {
+          otherPlant = player;
+        }
+      }
+    }
     hand = [...game.hands[playerId]];
     for (const player of game.players) {
       handSizes[player] = game.hands[player].length;
@@ -162,7 +172,7 @@ export function viewFor(room: Room, playerId: PlayerId): PlayerView {
     board,
     demand,
     pastDemands,
-    me: { playerId, role, hand, contribution },
+    me: { playerId, role, hand, contribution, otherPlant },
     players,
     lastReveal,
     vote,

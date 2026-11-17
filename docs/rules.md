@@ -4,11 +4,11 @@
 
 ## Overview
 
-A software team has four sprints to ship a release. One player is secretly the **Management Plant**, working toward a "strategic realignment" the slide deck already announces. Everyone else is on the **Delivery Team**.
+A software team has four sprints to ship a release. One player — two, with 8 or more players — is secretly the **Management Plant**, working toward a "strategic realignment" the slide deck already announces. Everyone else is on the **Delivery Team**.
 
-- **Players:** 5–7.
+- **Players:** 5–10.
 - **Delivery Team wins** if, after the fourth sprint, Progress has reached the Target and Morale is above 0.
-- **The Plant wins** otherwise, and immediately if Morale reaches 0.
+- **The Plant wins** otherwise, and immediately if Morale reaches 0. Two Plants win or lose together.
 - Nobody is eliminated. Suspected players are **audited**: their next contribution is played face up. Audits never reveal anyone's role.
 
 The central joke, and the basis for deduction: every harmful card has an innocent explanation.
@@ -19,29 +19,31 @@ The central joke, and the basis for deduction: every harmful card has an innocen
 
 ## Components
 
-**Role cards:** 1 Management Plant, plus one Delivery Team card per other player.
+**Role cards:** 1 Management Plant (2 with 8–10 players), plus one Delivery Team card per other player.
 
 **Board tracks:**
 
-| Track       | Start                      | Notes                                        |
-| ----------- | -------------------------- | -------------------------------------------- |
-| Progress    | 0                          | Never below 0.                               |
-| Target      | 5 × players − 2 **(knob)** | 5 players: 23, 6 players: 28, 7 players: 33. |
-| Morale      | 4 **(knob)**               | 0 ends the game; the Plant wins.             |
-| Debt        | 0                          | Never below 0. Causes incidents.             |
-| Audits left | 2 **(knob)**               | Shared by the whole team.                    |
-| Sprint      | 1                          | The game ends after sprint 4.                |
+| Track       | Start                      | Notes                                              |
+| ----------- | -------------------------- | -------------------------------------------------- |
+| Progress    | 0                          | Never below 0.                                     |
+| Target      | 5 × players − 2 **(knob)** | 5 players: 23, 6: 28, 7: 33, 8: 38, 9: 43, 10: 48. |
+| Morale      | 4 **(knob)**               | 0 ends the game; the Plant wins.                   |
+| Debt        | 0                          | Never below 0. Causes incidents.                   |
+| Audits left | 2 **(knob)**               | Shared by the whole team.                          |
+| Sprint      | 1                          | The game ends after sprint 4.                      |
 
-**Contribution deck (44 cards):**
+**Contribution deck (44 cards; 64 with 8–10 players):**
 
-| Card                 | Count | Effect                                                                                                                           |
-| -------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Feature Work         | 11    | +2 Progress.                                                                                                                     |
-| Temporary Workaround | 9     | +3 Progress, +1 Debt.                                                                                                            |
-| Test Coverage        | 8     | +1 Progress. Counts as **Testing**.                                                                                              |
-| Refactoring          | 6     | −2 Debt. Counts as **Refactoring**.                                                                                              |
-| Status Update        | 4     | No effect. Counts as **Visibility**.                                                                                             |
-| Alignment Workshop   | 6     | Meets this sprint's demand requirement. Every other card contributed this sprint gives 2 less Progress (never below 0 per card). |
+| Card                 | 5–7 players | 8–10 players | Effect                                                                                                                           |
+| -------------------- | ----------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Feature Work         | 11          | 17           | +2 Progress.                                                                                                                     |
+| Temporary Workaround | 9           | 14           | +3 Progress, +1 Debt.                                                                                                            |
+| Test Coverage        | 8           | 12           | +1 Progress. Counts as **Testing**.                                                                                              |
+| Refactoring          | 6           | 9            | −2 Debt. Counts as **Refactoring**.                                                                                              |
+| Status Update        | 4           | 6            | No effect. Counts as **Visibility**.                                                                                             |
+| Alignment Workshop   | 6           | 6            | Meets this sprint's demand requirement. Every other card contributed this sprint gives 2 less Progress (never below 0 per card). |
+
+With 8–10 players, shuffle in the 20 large-table cards (marked 8+): 6 Feature Work, 5 Temporary Workaround, 4 Test Coverage, 3 Refactoring, 2 Status Update. The mark is on the card's face only, for sorting after the game; the backs match the base deck.
 
 Several Alignment Workshops stack: each other card loses 2 Progress per Workshop. Workshops don't change Debt effects.
 
@@ -59,8 +61,8 @@ Several Alignment Workshops stack: each other card loses 2 Progress per Workshop
 ## Setup
 
 1. Set the Target from the player count. Morale 4, Debt 0, Progress 0, Audits left 2.
-2. Shuffle the role cards and deal one face down to each player. Look at yours privately.
-3. Shuffle the contribution deck and deal 3 cards to each player.
+2. Shuffle the role cards for your player count and deal one face down to each player. Look at yours privately. With 8–10 players: everyone closes their eyes; the two Plants open theirs and find each other; then the Plants close their eyes and everyone opens them.
+3. Shuffle the contribution deck for your player count and deal 3 cards to each player.
 4. Shuffle the demand deck. Put 4 face down as this game's demands; return the other 2 to the box without looking.
 
 ## A sprint
@@ -94,29 +96,31 @@ Play four sprints. Each one runs these steps in order.
 
 ## End of the game
 
-After sprint 4 resolves: if Progress is at least the Target and Morale is above 0, the Delivery Team wins. Otherwise the Plant wins. Everyone reveals their role. Who played which card stays unknown, as it was during play.
+After sprint 4 resolves: if Progress is at least the Target and Morale is above 0, the Delivery Team wins. Otherwise the Plant wins (both Plants, with 8–10 players). Everyone reveals their role. Who played which card stays unknown, as it was during play.
 
 ## Who sees what
 
 This table is the contract the browser game's per-player views must follow ([architecture](architecture.md#hidden-information)).
 
-| Information                                        | Who sees it                                                      |
-| -------------------------------------------------- | ---------------------------------------------------------------- |
-| Your role                                          | You, from setup.                                                 |
-| Other players' roles                               | Nobody, until the game ends.                                     |
-| Your hand                                          | You.                                                             |
-| Other players' hands                               | Nobody. The number of cards each holds is public.                |
-| Deck order and the 2 unused demands                | Nobody, ever.                                                    |
-| The next demand                                    | Nobody, until it's revealed.                                     |
-| Your contribution this sprint                      | You, from when you place it.                                     |
-| Whether a player has contributed yet               | Everyone. Not which card.                                        |
-| The revealed contributions                         | Everyone, after the reveal, in shuffled order, unattributed.     |
-| Which revealed card was yours                      | You.                                                             |
-| The audited player's contribution                  | Everyone, attributed to them.                                    |
-| The card removed by The Sprint Is Now One Week     | Nobody, ever.                                                    |
-| Your audit vote                                    | You, from when you cast it.                                      |
-| Other players' audit votes                         | Everyone, once all votes are in. Until then, only who has voted. |
-| Board tracks, demands revealed so far, nominations | Everyone.                                                        |
+| Information                                        | Who sees it                                                                                                          |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Your role                                          | You, from setup.                                                                                                     |
+| Other players' roles                               | Nobody, until the game ends. With two Plants, each Plant knows the other (next row).                                 |
+| The other Plant, at 8–10 players                   | Both Plants, from setup. Everyone, at the end. Knowing it, a Plant also knows everyone else is on the Delivery Team. |
+| How many Plants there are                          | Everyone: 1 at 5–7 players, 2 at 8–10.                                                                               |
+| Your hand                                          | You.                                                                                                                 |
+| Other players' hands                               | Nobody. The number of cards each holds is public.                                                                    |
+| Deck order and the 2 unused demands                | Nobody, ever.                                                                                                        |
+| The next demand                                    | Nobody, until it's revealed.                                                                                         |
+| Your contribution this sprint                      | You, from when you place it.                                                                                         |
+| Whether a player has contributed yet               | Everyone. Not which card.                                                                                            |
+| The revealed contributions                         | Everyone, after the reveal, in shuffled order, unattributed.                                                         |
+| Which revealed card was yours                      | You.                                                                                                                 |
+| The audited player's contribution                  | Everyone, attributed to them.                                                                                        |
+| The card removed by The Sprint Is Now One Week     | Nobody, ever.                                                                                                        |
+| Your audit vote                                    | You, from when you cast it.                                                                                          |
+| Other players' audit votes                         | Everyone, once all votes are in. Until then, only who has voted.                                                     |
+| Board tracks, demands revealed so far, nominations | Everyone.                                                                                                            |
 
 ## Example sprint
 
@@ -144,7 +148,7 @@ The browser game plays these rules with a few clarifications where a table would
 - **The audited card shows at the reveal,** face up and attributed, not when it's placed.
 - **The audited card is never removed.** The Sprint Is Now One Week removes one of the face-down cards only. The audited player has no card among the shuffled ones.
 - **If your card is the one removed,** the game shows you that none of the revealed cards is yours, so you learn it was yours. Nobody else learns anything, and the removed card is never shown.
-- **Draw happens when the next sprint starts,** so hands hold 2 cards during the retro. At these numbers the deck never runs out (7 players draw 21 + 3 × 7 = 42 of 44 cards), but the reshuffle rule is implemented anyway.
+- **Draw happens when the next sprint starts,** so hands hold 2 cards during the retro. At these numbers the deck never runs out (7 players draw 21 + 3 × 7 = 42 of 44 cards; 10 players draw 30 + 3 × 10 = 60 of 64), but the reshuffle rule is implemented anyway.
 
 ## Questions for the first playtest
 
@@ -156,4 +160,5 @@ Record for each game: player count, winner, final Progress against Target, Moral
 - Innocent players making defensible plays that still look suspicious.
 - Audits being a real choice rather than a routine.
 - Everyone staying involved until the end, and wanting to swap roles and play again.
+- With 8–10 players: do two Plants who know each other make votes and defences easier or harder to read? Do audits still pass (5 yes of 8 or 9, 6 of 10)? Are demands and One Week still felt? How long does a sprint take with ten people talking?
 - Whether the Target is reachable but tight. The simulation in [verification 01](verification/01-design-baseline.md) assumes perfect coordination, so real tables will likely score lower.

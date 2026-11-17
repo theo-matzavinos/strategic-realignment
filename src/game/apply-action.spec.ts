@@ -1,7 +1,7 @@
 import { actionSchema, type Action } from './action';
 import { applyAction, type RuleErrorCode } from './apply-action';
-import { cardTypes, type CardType } from './cards';
-import { addPlayer, type ContributeGame, type Game } from './game';
+import { cardTypes, contributionDeck, type CardType } from './cards';
+import { addPlayer, maxPlayers, minPlayers, type ContributeGame, type Game } from './game';
 import { act, lobby, started } from './testing/scenario';
 
 function countCards(cards: CardType[]): Record<string, number> {
@@ -12,13 +12,27 @@ function countCards(cards: CardType[]): Record<string, number> {
   return counts;
 }
 
+// docs/rules.md, Components: the contribution deck, 44 cards or 64 with 8–10 players.
+const baseDeck = { feature: 11, workaround: 9, tests: 8, refactoring: 6, status: 4, workshop: 6 };
+const largeTableDeck = {
+  feature: 17,
+  workaround: 14,
+  tests: 12,
+  refactoring: 9,
+  status: 6,
+  workshop: 6,
+};
+
 describe('startGame', () => {
-  for (const [playerCount, baseTarget] of [
-    [5, 23],
-    [6, 28],
-    [7, 33],
+  for (const { playerCount, baseTarget, plantCount, deck, deckSize } of [
+    { playerCount: 5, baseTarget: 23, plantCount: 1, deck: baseDeck, deckSize: 44 },
+    { playerCount: 6, baseTarget: 28, plantCount: 1, deck: baseDeck, deckSize: 44 },
+    { playerCount: 7, baseTarget: 33, plantCount: 1, deck: baseDeck, deckSize: 44 },
+    { playerCount: 8, baseTarget: 38, plantCount: 2, deck: largeTableDeck, deckSize: 64 },
+    { playerCount: 9, baseTarget: 43, plantCount: 2, deck: largeTableDeck, deckSize: 64 },
+    { playerCount: 10, baseTarget: 48, plantCount: 2, deck: largeTableDeck, deckSize: 64 },
   ]) {
-    it(`deals ${playerCount} players one Plant, 3 cards each and Target ${baseTarget}`, () => {
+    it(`deals ${playerCount} players ${plantCount} Plant(s), 3 cards each and Target ${baseTarget}`, () => {
       const game = started(playerCount);
 
       let plants = 0;
@@ -30,19 +44,11 @@ describe('startGame', () => {
         expect(game.hands[player]).toHaveLength(3);
         dealt.push(...game.hands[player]);
       }
-      expect(plants).toBe(1);
+      expect(plants).toBe(plantCount);
       expect(Object.keys(game.roles)).toHaveLength(playerCount);
 
-      expect(game.deck).toHaveLength(44 - 3 * playerCount);
-      // docs/rules.md, Components: the contribution deck.
-      expect(countCards([...dealt, ...game.deck])).toEqual({
-        feature: 11,
-        workaround: 9,
-        tests: 8,
-        refactoring: 6,
-        status: 4,
-        workshop: 6,
-      });
+      expect(game.deck).toHaveLength(deckSize - 3 * playerCount);
+      expect(countCards([...dealt, ...game.deck])).toEqual(deck);
 
       // docs/rules.md, Components: the demand deck.
       expect(game.demands).toHaveLength(4);
@@ -119,6 +125,27 @@ describe('startGame', () => {
     expect([...plantSeats].sort()).toEqual(['p1', 'p2', 'p3', 'p4', 'p5']);
   });
 
+  it('shuffles the roles at 10 players: the two Plants sit in every seat across seeds', () => {
+    const plantSeats = new Set<string>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const game = started(10, seed);
+      for (const player of game.players) {
+        if (game.roles[player] === 'plant') {
+          plantSeats.add(player);
+        }
+      }
+    }
+
+    expect(plantSeats.size).toBe(10);
+  });
+
+  it('has enough cards at every player count that a four-sprint game never reshuffles', () => {
+    // Setup deals 3 per player, and sprints 2–4 each draw one per player: 6 per player in all.
+    for (let playerCount = minPlayers; playerCount <= maxPlayers; playerCount++) {
+      expect(contributionDeck(playerCount).length).toBeGreaterThanOrEqual(6 * playerCount);
+    }
+  });
+
   it('shuffles the deck: hands and the remaining order vary across seeds', () => {
     const firstHands = new Set<string>();
     const deckOrders = new Set<string>();
@@ -166,13 +193,13 @@ describe('startGame', () => {
     expect(applyAction(started(5), 'p1', { type: 'startGame' })).toEqual({ code: 'WRONG_PHASE' });
   });
 
-  it('never seats more than 7 players', () => {
-    expect(() => addPlayer(lobby(7), 'p8')).toThrow();
+  it('never seats more than 10 players', () => {
+    expect(() => addPlayer(lobby(10), 'p11')).toThrow();
   });
 
-  it('refuses to deal a corrupted lobby with more than 7 players', () => {
-    const game = lobby(7);
-    const corrupted = { ...game, players: [...game.players, 'p8'] };
+  it('refuses to deal a corrupted lobby with more than 10 players', () => {
+    const game = lobby(10);
+    const corrupted = { ...game, players: [...game.players, 'p11'] };
 
     expect(() => applyAction(corrupted, 'p1', { type: 'startGame' })).toThrow();
   });

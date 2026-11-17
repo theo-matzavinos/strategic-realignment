@@ -179,7 +179,8 @@ function startNextSprint(game: RetroGame): ContributeGame {
 
       const card = deck.shift();
       if (card === undefined) {
-        // 44 cards and at most 21 in hands: the deck and discard pile can't both be empty.
+        // 44 cards and at most 21 in hands (64 and 30 with 8–10 players): the deck and discard
+        // pile can't both be empty.
         throw new Error('The deck and the discard pile are both empty');
       }
       hand.push(card);

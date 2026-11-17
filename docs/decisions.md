@@ -207,3 +207,30 @@ The source is public. Team game sessions run on a private deployment, to be chos
 **Chosen:** return `{ version }`, the room's version right after the action ([architecture](architecture.md#how-a-change-reaches-players)). If the response is lost, the control is usable again at once with "Couldn't reach the server. Try again."; a retry is checked against the current game, so if the action had in fact gone through and still stands, it gets its declared refusal, such as "You've already voted." A Ready that a nomination has since cleared can be marked again, as it should.
 
 **Why:** the version is already in every view, so it leaks nothing, and it is the only causal link between a response and a snapshot. Reopening the stream after a lost response was tried and dropped: Launch 0.0.6's `reconnect()` does nothing while a stream is open, so it needed undocumented Launch behavior, for a rare network failure that a declared refusal already covers.
+
+## D18. Rules v0 at 8–10 players: two Plants and twenty more cards
+
+**2026-11-17**
+
+**Context:** the team that will play is ten people, and rules v0 stopped at 7. Two throwaway prototypes ran the real rules engine with 8–10 players under two simulated policies, 5,000 games per setting: _static-debt_, which reproduces the [verification 01](verification/01-design-baseline.md) simulator that [D8](#d8-rules-v0-balance-give-the-plant-real-leverage) was tuned with to within 1.6–5.4 points at 5–7 players, and _main_, a stronger, coordinating team. Neither models lying, inference or negotiation.
+
+**Options:**
+
+- **A: one Plant, a 64-card deck** with v0's proportions, 9 Alignment Workshops among them. The closest numeric match to 5–7 at every sabotage rate, and no change to roles or views. But one suspect among nine: the chance that a given player is the Plant falls to 10–12.5%, below 5–7's 14–20%, and the Plant's measured swing on the outcome is smaller than at 5–7.
+- **B: two Plants, 64 cards:** v0's 44 plus 20 without Workshops (6 Feature Work, 5 Temporary Workaround, 4 Test Coverage, 3 Refactoring, 2 Status Update). A Plant prior of 20–25%, close to 5–7's, the largest measured swing, and three of the four calibration points within 1.7 points of D8's 5-player row. An honest table (Plants never sabotaging) wins about 10 points more often than in D8's 5-player row.
+- **Two Plants who know each other, or who don't.** Known Plants can defend, bus or avoid auditing each other, which gives the Delivery Team a signal in votes; unknown Plants need no view change.
+
+**Delivery Team win rate at Target 5 × players − 2,** for Plants sabotaging in 0 / 30 / 60 / 100% of sprints:
+
+| Setup                         | static-debt                    | main                             |
+| ----------------------------- | ------------------------------ | -------------------------------- |
+| D8, 5 players (old simulator) | 85 / 60 / 46 / 36              | —                                |
+| v0 today, 5–7 players         | 88–89 / 63–64 / 48–50 / 39–42  | 95–98 / 78–85 / 63–71 / 50–59    |
+| A, 8–10 players               | 81–84 / 57–60 / 45–47 / 38–39  | 96 / 81–82 / 67–70 / 56–60       |
+| **B, 8–10 players**           | **95–96 / 60–62 / 45 / 35–36** | **99.6 / 83–86 / 65–71 / 50–57** |
+
+**Chosen:** B, with the Plants knowing each other. At 8–10 players, two Plants and the 20 extra cards; at 5–7 nothing changes, and the 44-card deck stays. Target 5 × players − 2 (38, 43, 48), Morale 4, Audits left 2, an audit passing on more than half of all players (5, 5 and 6 yes votes), and demands and the retro stay as they are. The browser game shows each Plant the other one ([architecture](architecture.md#hidden-information)); on paper the Plants find each other with eyes closed at setup ([rules](rules.md#setup)).
+
+**Why:** the reasons for B are social: a prior near 5–7's, two suspects, and votes and defences that can line up. No simulation measures deduction or fun. The one measured advantage that bears on them is that the Plants' choices move the outcome more under B than under A. On the simulations alone, A is the closer calibration match and the smaller change. The Plants' knowledge of each other was simulated as two independent Plants; how it changes card play and votes is unmeasured. Every number stays a knob, and the paper playtest decides.
+
+The simulators were throwaway, as verification 01's was; their patches and reports are kept with this slice's notes ([verification 04](verification/04-ten-players.md#evidence-kept)).

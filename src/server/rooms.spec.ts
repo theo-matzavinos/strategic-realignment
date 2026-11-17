@@ -90,12 +90,13 @@ describe('ServerRoom.join', () => {
     expect(room.version).toBe(2);
   });
 
-  it('refuses an 8th player', () => {
-    const room = roomWith(7);
+  it('seats a 10th player and refuses an 11th', () => {
+    const room = roomWith(9);
 
-    expect(room.join('s8', 'Player 8')).toBe('ROOM_FULL');
-    expect(room.players).toHaveLength(7);
-    expect(room.seats.has('s8')).toBe(false);
+    expect(room.join('s10', 'Player 10')).toBeNull();
+    expect(room.join('s11', 'Player 11')).toBe('ROOM_FULL');
+    expect(room.players).toHaveLength(10);
+    expect(room.seats.has('s11')).toBe(false);
   });
 
   it('refuses a new player once the game has started', () => {

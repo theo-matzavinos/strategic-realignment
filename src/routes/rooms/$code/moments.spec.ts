@@ -21,7 +21,13 @@ const booking: PlayerView = {
   board: { progress: 0, target: 23, morale: 4, debt: 0, auditsLeft: 2 },
   demand: 'penTest',
   pastDemands: [],
-  me: { playerId: 'p1', role: 'delivery', hand: ['feature', 'tests'], contribution: 'feature' },
+  me: {
+    playerId: 'p1',
+    role: 'delivery',
+    hand: ['feature', 'tests'],
+    contribution: 'feature',
+    otherPlant: null,
+  },
   players: names.map((name, seat) => ({
     playerId: `p${seat + 1}`,
     name,

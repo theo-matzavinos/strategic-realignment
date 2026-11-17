@@ -100,7 +100,9 @@ export type Game = LobbyGame | ContributeGame | RetroGame | EndedGame;
 
 export const minPlayers = 5;
 export const handSize = 3;
-export const maxPlayers = 7;
+export const maxPlayers = 10;
+/** From this many players, rules v0 deals two Plants and adds the large-table cards. */
+export const largeTablePlayers = 8;
 
 /** The game's latest revealed demand: this sprint's. */
 export function currentDemand(game: ContributeGame | RetroGame | EndedGame): DemandType {
@@ -116,6 +118,14 @@ export const startingBoard: Omit<Board, 'target'> = {
 
 export function startingTarget(playerCount: number): number {
   return 5 * playerCount - 2;
+}
+
+export function plantCount(playerCount: number): number {
+  if (playerCount < largeTablePlayers) {
+    return 1;
+  }
+
+  return 2;
 }
 
 /** A new lobby with its creator as host. `seed` must be a 32-bit unsigned integer. */

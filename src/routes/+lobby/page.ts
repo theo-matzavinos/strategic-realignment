@@ -40,8 +40,8 @@ import { injectRpc } from './rpc.generated';
               <span class="block">One of you would rather it didn’t.</span>
             </h1>
             <p class="max-w-[60ch] text-[16px] text-pretty text-fg-muted">
-              A hidden-role card game for 5–7 colleagues on a call. Book your work in secret, review
-              it together, and audit whoever seems a little too aligned.
+              A hidden-role card game for 5–10 colleagues on a call. Book your work in secret,
+              review it together, and audit whoever seems a little too aligned.
             </p>
           </div>
 

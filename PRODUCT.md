@@ -8,13 +8,13 @@ web
 
 ## Users
 
-A software team of about 10 colleagues who play together, 5–7 per game, each on their own device. Everyone is talking on their usual video call, remote or in person; the game has no chat. A game takes roughly 20–30 minutes (an assumption until playtests measure it). Desktop browsers come first, and phones should work.
+A software team of about 10 colleagues who play together, 5–10 per game, each on their own device. Everyone is talking on their usual video call, remote or in person; the game has no chat. A game takes roughly 20–30 minutes (an assumption until playtests measure it). Desktop browsers come first, and phones should work.
 
-With 10 people and rules for 5–7, the first team playtest runs two games of 5 at once, each group on its own call. Rules for 8–10 players are being designed separately and aren't decided.
+Rules v0 seats 5–10. At 8–10 there are two Management Plants who know each other and win or lose together, and a larger deck (`docs/rules.md`, decision D18). The whole team of 10 can play one game on one call.
 
 ## Product Purpose
 
-Strategic Realignment is a browser game that satirizes life as a software engineer in a toxic workplace. A team ships a release over four sprints while one hidden player, the Management Plant, quietly works for the reorganization. It has two goals of equal weight: a game the team wants to play again, and a documented process from design to verification that the team can read as a worked example.
+Strategic Realignment is a browser game that satirizes life as a software engineer in a toxic workplace. A team ships a release over four sprints while one hidden player, the Management Plant (two of them at 8–10 players), quietly works for the reorganization. It has two goals of equal weight: a game the team wants to play again, and a documented process from design to verification that the team can read as a worked example.
 
 Success means a full game runs with no developer repairing it, and players want to swap roles and play again.
 
@@ -37,10 +37,10 @@ Contributions are secret and shuffled before the reveal. Everyone sees what happ
 ## Capabilities and Constraints
 
 - Rules v0 lives in `docs/rules.md` and is authoritative. The app implements exactly those rules.
-- Hidden information is strict. Each player sees only their own role and hand. Other players' hands show only a count, and the reveal never shows who played which card (except an audited player's card). Any presentation, ordering or animation must preserve this.
+- Hidden information is strict. Each player sees only their own role and hand; with two Plants, each Plant also knows the other. Other players' hands show only a count, and the reveal never shows who played which card (except an audited player's card). Any presentation, ordering or animation must preserve this.
 - State lives in one Durable Object's memory. A deploy ends games in progress.
 - Non-goals: accounts, matchmaking, public lobbies, persistence or progression, monetization, native apps, a generic engine.
-- Stack: Angular with `@loozo/angular-launch` on Cloudflare Workers, plus Tailwind. Playwright drives full games in 5–7 browser contexts, locally and deployed.
+- Stack: Angular with `@loozo/angular-launch` on Cloudflare Workers, plus Tailwind. Playwright drives full games in 5, 7 and 10 browser contexts, locally and deployed.
 
 ## Brand Commitments
 

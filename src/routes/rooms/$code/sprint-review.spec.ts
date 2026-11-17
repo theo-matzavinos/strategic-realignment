@@ -18,7 +18,13 @@ function retroView(reveal: Partial<Reveal> & { cards: CardType[] }): PlayerView 
     board: { progress: 9, target: 23, morale: 4, debt: 1, auditsLeft: 2 },
     demand: 'penTest',
     pastDemands: [],
-    me: { playerId: 'p1', role: 'delivery', hand: ['feature', 'tests'], contribution: null },
+    me: {
+      playerId: 'p1',
+      role: 'delivery',
+      hand: ['feature', 'tests'],
+      contribution: null,
+      otherPlant: null,
+    },
     players: names.map((name, seat) => ({
       playerId: `p${seat + 1}`,
       name,

@@ -114,6 +114,7 @@ type PlayerView = {
     role: 'plant' | 'delivery' | null; // null in the lobby
     hand: CardType[];
     contribution: CardType | null; // this sprint, until the reveal
+    otherPlant: PlayerId | null; // the other Plant, only in a Plant's view in a two-Plant game
   };
   players: {
     playerId: PlayerId;
@@ -152,6 +153,7 @@ What some fields mean in each phase ([digital rules](rules.md#digital-game)):
 
 - `players[].isAudited`: in `contribute`, plays face up this sprint; in `retro`, will play face up next sprint (the passed vote's nominee); always false in `ended`.
 - `me.contribution` and `players[].hasContributed`: this sprint's placement, only in `contribute`.
+- `me.otherPlant`: with 8–10 players, a Plant's view names the other Plant, from `contribute` through `ended`. Null in the lobby, for Delivery players and with one Plant.
 - `lastReveal`: the latest reveal. It stays through the retro, the next `contribute` phase and `ended`.
 - `vote`: in `retro`, and in `ended` only when a passed audit took Morale to 0 and ended the game, so everyone sees the deciding vote (its `outcome` is then complete, with `passed` true). Null in `ended` otherwise. `voted`, `outcome.yes` and `outcome.no` list players in seat order.
 - `retroReady`: only in `retro`, in seat order. `result`: only in `ended`.
@@ -164,6 +166,8 @@ Each row of the [rules' visibility table](rules.md#who-sees-what) maps to exactl
 | Rule                                                         | In the view                                                                                                                        |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Your role / others' roles until the end                      | `me.role` / `result.roles`, only when `phase` is `"ended"`                                                                         |
+| The other Plant (8–10 players)                               | `me.otherPlant`, only in a Plant's view                                                                                            |
+| How many Plants there are                                    | Nowhere; follows from `players.length`                                                                                             |
 | Your hand / others' hand sizes only                          | `me.hand` / `players[].handSize`                                                                                                   |
 | Deck order, unused demands, next demand                      | Nowhere                                                                                                                            |
 | Your contribution / whether others contributed               | `me.contribution` / `players[].hasContributed`                                                                                     |
@@ -188,5 +192,5 @@ Three leaks the design rules out by construction: card ids (there aren't any), s
 
 1. **Rules engine:** replay tests from seed and action log against the outcomes [rules.md](rules.md) specifies, one per rule and demand.
 2. **Hidden information:** for every step of replayed games and every player, check that the view has no other player's hand, no role before the end, never the removed card, and reveal order independent of submission order.
-3. **End to end:** Playwright drives five to seven isolated browser contexts through a full game in the real app.
+3. **End to end:** Playwright drives five to ten isolated browser contexts through a full game in the real app.
 4. **Team session:** the real thing, on everyone's own devices.

@@ -134,3 +134,25 @@ export function playerNames(room: PlayerView, playerIds: PlayerId[]): string {
 
   return names.join(', ');
 }
+
+/**
+ * Who won and the verb, without the article: "Delivery Team wins", or "Management Plant wins", plural
+ * when two Plants won together (8–10 players).
+ */
+export function winnerPhrase(result: NonNullable<PlayerView['result']>): string {
+  if (result.winner === 'delivery') {
+    return `${roleNames.delivery} wins`;
+  }
+
+  let plants = 0;
+  for (const role of Object.values(result.roles)) {
+    if (role === 'plant') {
+      plants++;
+    }
+  }
+  if (plants > 1) {
+    return `${roleNames.plant}s win`;
+  }
+
+  return `${roleNames.plant} wins`;
+}

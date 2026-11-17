@@ -220,12 +220,12 @@ Breakpoint: `desk:` is 1280px and up; `max-desk:` is the phone day view below 12
 **Desktop**, top to bottom:
 
 1. **Top bar** (56px, `chrome`): the SR mark and name; "Team calendar" with the room code chip and its copy button (the code is the `h1`); "Sprint n of 4" ×4, done/current/upcoming, not navigation (the current sprint only on the day view); the connection status and Reconnect. When its contents don't fit on one row, such as "Connection lost" with Reconnect on a phone, the sprint and status wrap onto a second row, right-aligned; nothing shrinks under its neighbour.
-2. **Tracks strip** (`sunken`, columns `1.7fr 1fr 1fr 1fr 280px`): Progress `n / target` with a bar, Morale with four pips, Debt with "incident at 3", Audits left, and a "Now" cell with the phase hint ("Game over" with "Show result" at the end).
+2. **Tracks strip** (`sunken`, columns `1.7fr 1fr 1fr 1fr 280px`): Progress `n / target` with a bar, Morale with four pips, Debt with "incident at 3", Audits left, and a "Now" cell with the phase hint ("Game over", the winner, and "Show result" at the end; "The Management Plants win" when two Plants won together).
 3. **The table** (`minmax(0,1fr) 280px`): the week on the left, attendees on the right.
    - The week is a CSS grid `52px var(--week-columns)` with three rows: day headers, lanes (subgrid, so headers align), and the Debt band. The hour gutter and 64px hour rows are background texture that never sets the height.
    - Column widths follow the current day: contribute `1.1fr 2fr 1fr 0.9fr`, the review `0.8fr 1fr 2fr 1.2fr`, the vote `0.8fr 1fr 1.5fr 1.7fr`. The current day is underlined in `brand` and carries `aria-current="date"`.
    - The current day: Tue–Wed while the team books; Thursday from the reveal until a vote opens; Friday once it has. After the game, Friday if a vote ended it, otherwise Thursday.
-4. **Hand tray** (`sunken`, `220px minmax(0,1fr) 280px`, sticky at the bottom): your role, your hand, the phase's action.
+4. **Hand tray** (`sunken`, `220px minmax(0,1fr) 280px`, sticky at the bottom): your role, your hand, the phase's action. With two Plants (8–10 players), a Plant's role box also reads "The other Plant: {name}", in the same box and styling.
 
 **Phone** (below 1280px): a compact top bar (mark, code chip, current sprint only, status; the sprint and status take a second row while the connection is down); the tracks as a 4-up strip with the Now cell only at the end; four day tabs in one row (all four always visible) that follow the phase until you tap another day; one lane; attendees as wrapping pills; the tray as a sticky bottom sheet with the role as a pill, sideways-scrolling cards and a full-width action. No horizontal page scroll at 390px.
 
@@ -236,12 +236,12 @@ Breakpoint: `desk:` is 1280px and up; `max-desk:` is the phone day view below 12
 - **Thu · Sprint Review:** during the retro and after the game, one row per card in `lastReveal.cards` order exactly, yours marked "You", the audited card last and attributed, a dashed "1 removed, unseen" row under One Week; then meeting notes (Progress `+n`, the demand's outcome, any incident). While the team books, a dim placeholder.
 - **Fri · Retro:** the poll ("Audit Chidi?", the yes threshold, Yes/No, voted so far without how), then the "Retro · now" event: the nomination, "plays face up next sprint", and "Ready for sprint n".
 
-**Attendees:** a seat-colored initial, name, "(you)", host and cards in hand, and state tags for the phase. Built to hold 10 rows.
+**Attendees:** a seat-colored initial, name, "(you)", host and cards in hand, and state tags for the phase. Holds 10 rows, the most a game seats.
 
 **Outside the game.** These pages center one raised panel (`raised`, a `line` border, `rounded-dialog`, `shadow-dialog`) under a top bar, in a `minmax(0,1fr)` grid column so a fixed-width panel never widens the page. They switch at `md:` (768px), not `desk:`, since they have no week to fit.
 
 - **Lobby (`/`):** a top bar with the brand only; the hero headline "Your release ships in four sprints. / One of you would rather it didn’t." and its lead; then one panel split into "New team calendar" (name, Create room, primary with the calendar icon) and "Join with a code" (code, name, Join room, secondary), side by side from `md:` with a `line` between, stacked below. The code input is uppercase, 800, tracked 0.3em.
-- **Waiting room** (`app-waiting-room`, the room's lobby phase): a 640px meeting invite. A `brand-fill` band "Meeting invite · Sprint 1 kickoff"; the title "Release: Q3 Platform Excellence"; "Organizer Ana (you) · join with code ETNQ" and "4 sprints · 5–7 attendees · one of you works for management"; one row per player with "(you, host)" / "(you)" / "(host)" and an "Accepted" tag; below the minimum, a "Waiting for at least n more. Share the code." row (outside the attendee list) with a plus in a `neutral-bg` circle. The host's footer has "Start sprint 1", disabled below the minimum with "Needs 5 to start." beside it as its description; everyone else's reads "Waiting for the host to start the game."
+- **Waiting room** (`app-waiting-room`, the room's lobby phase): a 640px meeting invite. A `brand-fill` band "Meeting invite · Sprint 1 kickoff"; the title "Release: Q3 Platform Excellence"; "Organizer Ana (you) · join with code ETNQ" and "4 sprints · 5–10 attendees · one or two of you work for management" (two Plants from 8 players, and the count isn't final until the host starts); one row per player with "(you, host)" / "(you)" / "(host)" and an "Accepted" tag; below the minimum, a "Waiting for at least n more. Share the code." row (outside the attendee list) with a plus in a `neutral-bg` circle. The host's footer has "Start sprint 1", disabled below the minimum with "Needs 5 to start." beside it as its description; everyone else's reads "Waiting for the host to start the game."
 - **Join refusal:** "Join this room" in a 430px panel styled like a half of the lobby's, with the join form minus the code.
 - **Invalid code:** "This isn't a room code." with a "Back to the lobby" link button, in the same panel.
 - **Loading:** "Loading the room…" in `fg-muted`, centered.
@@ -309,7 +309,7 @@ One authored moment per big event, each an exponential ease-out (`ease-out-expo`
 ## Do's and Don'ts
 
 - **Do** render anything about cards only from fields the view sends, in the order it sends them. Never order, group or animate reveal rows by seat.
-- **Do** keep the role box identical for both roles.
+- **Do** keep the role box identical for both roles. The only difference is a two-Plant game's "The other Plant" line, which only a Plant has to know.
 - **Do** name every section as a labelled region and every button by its visible text.
 - **Do** theme browser surfaces from the palette: selection, focus rings, the caret, scrollbars.
 - **Don't** add a light theme or use raw hex in templates; add a token to `theme.css` instead.

@@ -65,7 +65,7 @@ test('five isolated players create, join and start a game, each seeing only thei
     await expect(players(host)).toHaveText([/^\s*A\s*Ana \(you, host\)\s*Accepted\s*$/]);
     await expect(waitingRoom(host)).toContainText(`Organizer Ana (you) · join with code ${code}`);
     await expect(waitingRoom(host)).toContainText(
-      '4 sprints · 5–7 attendees · one of you works for management',
+      '4 sprints · 5–10 attendees · one or two of you work for management',
     );
 
     // Below five players the host can't start, and the invite says how many more it needs.
@@ -109,6 +109,10 @@ test('five isolated players create, join and start a game, each seeing only thei
       await expect(players(page)).toContainText(names);
       await expect(page.getByRole('status')).toHaveText('Live');
       await expect(waitingRoom(page).getByText(/^Waiting for at least/)).toHaveCount(0);
+      // The room seats up to 10, from rules v0's maxPlayers.
+      await expect(waitingRoom(page)).toContainText(
+        '4 sprints · 5–10 attendees · one or two of you work for management',
+      );
     }
     for (const guest of guests) {
       await expect(waitingRoom(guest)).toContainText(`Organizer Ana · join with code ${code}`);
@@ -186,8 +190,16 @@ test('five isolated players create, join and start a game, each seeing only thei
       expect(view['phase']).toBe('contribute');
 
       const { me, ...everythingButMe } = view as { me: Record<string, unknown> };
-      expect(Object.keys(me).sort()).toEqual(['contribution', 'hand', 'playerId', 'role']);
+      expect(Object.keys(me).sort()).toEqual([
+        'contribution',
+        'hand',
+        'otherPlant',
+        'playerId',
+        'role',
+      ]);
       expect(me['hand']).toHaveLength(3);
+      // One Plant at 5 players, so nobody has another Plant to know.
+      expect(me['otherPlant']).toBeNull();
       seenPlayers.add(me['playerId'] as string);
       if (me['role'] === 'plant') {
         plantViews++;

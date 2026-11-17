@@ -49,6 +49,9 @@ type Coverage = {
   failedAudits: number;
   endedByAudit: number;
   winners: Record<string, number>;
+  twoPlantGames: number;
+  plantViewsWithOtherPlant: number;
+  deliveryViewsWithTwoPlants: number;
 };
 
 const coverage: Coverage = {
@@ -62,6 +65,9 @@ const coverage: Coverage = {
   failedAudits: 0,
   endedByAudit: 0,
   winners: {},
+  twoPlantGames: 0,
+  plantViewsWithOtherPlant: 0,
+  deliveryViewsWithTwoPlants: 0,
 };
 
 function apply(game: Game, { playerId, action }: LoggedAction): Game {
@@ -106,7 +112,11 @@ function checkOnlyViewFields(problems: Problems, view: PlayerView, game: Game): 
     ['auditsLeft', 'debt', 'morale', 'progress', 'target'],
     'board keys',
   );
-  problems.same(keysOf(view.me), ['contribution', 'hand', 'playerId', 'role'], 'me keys');
+  problems.same(
+    keysOf(view.me),
+    ['contribution', 'hand', 'otherPlant', 'playerId', 'role'],
+    'me keys',
+  );
   for (const player of view.players) {
     problems.same(
       keysOf(player),
@@ -268,12 +278,30 @@ function checkHiddenInformation(
     if (game.phase === 'lobby') {
       problems.same(view.me.role, null, 'role');
       problems.same(view.me.hand, [], 'hand');
+      problems.same(view.me.otherPlant, null, 'the other Plant in the lobby');
       continue;
     }
 
     // Your own hand and role; everyone else's hand only as a size.
     problems.same(view.me.hand, game.hands[playerId], 'hand');
     problems.same(view.me.role, game.roles[playerId], 'role');
+
+    // The other Plant, by value: a role-free id that the role search below can't catch.
+    const otherPlants: PlayerId[] = [];
+    for (const player of game.players) {
+      if (player !== playerId && game.roles[player] === 'plant') {
+        otherPlants.push(player);
+      }
+    }
+    if (game.roles[playerId] === 'plant' && otherPlants.length === 1) {
+      problems.same(view.me.otherPlant, otherPlants[0], 'the other Plant');
+      coverage.plantViewsWithOtherPlant++;
+    } else {
+      problems.same(view.me.otherPlant, null, 'the other Plant');
+    }
+    if (game.roles[playerId] === 'delivery' && otherPlants.length === 2) {
+      coverage.deliveryViewsWithTwoPlants++;
+    }
     for (const player of view.players) {
       problems.same(player.handSize, game.hands[player.playerId].length, 'hand size');
     }
@@ -472,7 +500,7 @@ function walk(final: Game, problems: Problems): void {
 }
 
 describe('hidden information in seeded random games', () => {
-  for (const playerCount of [5, 6, 7]) {
+  for (const playerCount of [5, 6, 7, 8, 9, 10]) {
     for (let index = 1; index <= gamesPerPlayerCount; index++) {
       const seed = playerCount * 1000 + index;
 
@@ -488,6 +516,15 @@ describe('hidden information in seeded random games', () => {
         coverage.games++;
         if (final.phase === 'ended') {
           coverage.winners[final.winner] = (coverage.winners[final.winner] ?? 0) + 1;
+          let plants = 0;
+          for (const player of final.players) {
+            if (final.roles[player] === 'plant') {
+              plants++;
+            }
+          }
+          if (plants === 2) {
+            coverage.twoPlantGames++;
+          }
         }
       });
     }
@@ -512,14 +549,18 @@ describe('hidden information in seeded random games', () => {
   });
 
   it('covered what it should: removals with an audit, both audit outcomes, both winners', () => {
-    expect(coverage.games).toBe(3 * gamesPerPlayerCount);
+    expect(coverage.games).toBe(6 * gamesPerPlayerCount);
+    expect(coverage.twoPlantGames).toBe(3 * gamesPerPlayerCount);
+    expect(coverage.plantViewsWithOtherPlant).toBeGreaterThan(0);
+    expect(coverage.deliveryViewsWithTwoPlants).toBeGreaterThan(0);
     expect(coverage.endedByAudit).toBeGreaterThan(0);
     expect(coverage.removedWithAudited).toBeGreaterThan(0);
     expect(coverage.passedAudits).toBeGreaterThan(0);
     expect(coverage.failedAudits).toBeGreaterThan(0);
     expect(coverage.winners['delivery']).toBeGreaterThan(0);
     expect(coverage.winners['plant']).toBeGreaterThan(0);
-    // Shuffled, not in seat order: a 5-card reveal lands in seat order 1 time in 120.
+    // Shuffled, not in seat order: a 5-card reveal lands in seat order 1 time in 120, a 10-card
+    // one 1 time in 3,628,800.
     expect(coverage.revealsInSeatOrder).toBeLessThan(coverage.reveals / 10);
   });
 });

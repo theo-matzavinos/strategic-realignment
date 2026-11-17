@@ -13,7 +13,7 @@ import { Button, ButtonLink } from '#ui/button';
 import { LucideCalendar, LucideTriangleAlert } from '@lucide/angular';
 import { Tag } from '#ui/tag';
 import type { PlayerView } from '../../../game/view';
-import { roleNames } from './display-names';
+import { roleNames, winnerPhrase } from './display-names';
 import { Moments } from './moments';
 import { SeatAvatar } from './seat-avatar';
 
@@ -21,7 +21,8 @@ type Result = NonNullable<PlayerView['result']>;
 
 /**
  * The end of the game as a calendar invite over the blurred board: a mandatory all-hands when the
- * Management Plant wins, an optional celebration when the Delivery Team does. It lists every role.
+ * Management Plant wins (or both, at 8–10 players), an optional celebration when the Delivery Team
+ * does. It lists every role.
  * "Back to the board" closes it; `open` reopens it.
  */
 @Component({
@@ -130,13 +131,7 @@ export class EndInvite {
     return result;
   });
   protected readonly plantWins = computed(() => this.result().winner === 'plant');
-  protected readonly winnerLine = computed(() => {
-    if (this.plantWins()) {
-      return 'the Management Plant wins.';
-    }
-
-    return 'the Delivery Team wins.';
-  });
+  protected readonly winnerLine = computed(() => `the ${winnerPhrase(this.result())}.`);
   protected readonly scoreLine = computed(() => {
     const { board, sprint } = this.room();
     if (board.morale === 0) {

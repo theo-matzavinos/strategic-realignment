@@ -2,7 +2,7 @@ import { applyAction } from './apply-action';
 import { contributionDeck, type CardType } from './cards';
 import type { Game, RetroGame } from './game';
 import { replay } from './replay';
-import { inContribute, inRetro } from './testing/narrow';
+import { inContribute, inEnded, inRetro } from './testing/narrow';
 import {
   act,
   allReady,
@@ -122,6 +122,73 @@ describe('audits', () => {
   });
 });
 
+describe('a 10-player game', () => {
+  it('passes an audit on 6 yes, fails one on a 5–5 tie, and two Plants win together', () => {
+    // Each sprint plays every player's first card, so finding a seed tries one assignment a sprint.
+    const { seed, players, log } = findScenario(10, [
+      sprint(),
+      audit('p1', 'p2', ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']),
+      allReady(),
+      sprint(),
+      audit('p3', 'p4', ['p1', 'p2', 'p3', 'p4', 'p5']),
+      allReady(),
+      sprint(),
+      allReady(),
+      sprint(),
+      expectState((after) => after.phase === 'ended' && after.winner === 'plant'),
+    ]);
+
+    const closingVotes: number[] = [];
+    let votes = 0;
+    for (let index = 0; index < log.length; index++) {
+      if (log[index].action.type === 'vote') {
+        votes++;
+        if (votes % 10 === 0) {
+          closingVotes.push(index + 1);
+        }
+      }
+    }
+    expect(closingVotes).toHaveLength(2);
+
+    const beforePass = inRetro(replay(seed, players, log.slice(0, closingVotes[0] - 1)));
+    const passed = inRetro(replay(seed, players, log.slice(0, closingVotes[0])));
+    expect(passed.board.auditsLeft).toBe(1);
+    expect(passed.board.morale).toBe(beforePass.board.morale - 1);
+    expect(passed.nextAudited).toBe('p2');
+    expect(viewFor(roomFor(passed), 'p10').vote?.outcome).toEqual({
+      passed: true,
+      yes: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'],
+      no: ['p7', 'p8', 'p9', 'p10'],
+    });
+
+    const beforeTie = inRetro(replay(seed, players, log.slice(0, closingVotes[1] - 1)));
+    const tied = inRetro(replay(seed, players, log.slice(0, closingVotes[1])));
+    expect(tied.board).toEqual(beforeTie.board);
+    expect(tied.nextAudited).toBeNull();
+    expect(viewFor(roomFor(tied), 'p10').vote?.outcome).toEqual({
+      passed: false,
+      yes: ['p1', 'p2', 'p3', 'p4', 'p5'],
+      no: ['p6', 'p7', 'p8', 'p9', 'p10'],
+    });
+
+    const ended = inEnded(replay(seed, players, log));
+    expect(ended.sprint).toBe(4);
+    const plants: string[] = [];
+    for (const player of ended.players) {
+      if (ended.roles[player] === 'plant') {
+        plants.push(player);
+      }
+    }
+    expect(plants).toHaveLength(2);
+    for (const player of ended.players) {
+      expect(viewFor(roomFor(ended), player).result).toEqual({
+        winner: 'plant',
+        roles: ended.roles,
+      });
+    }
+  });
+});
+
 describe('the end of a retro', () => {
   function firstRetro(): { scenario: Scenario; game: RetroGame } {
     const scenario = findScenario(5, [calmSprint]);
@@ -208,6 +275,6 @@ describe('the end of a retro', () => {
     for (const player of next.players) {
       everyCard.push(...next.hands[player]);
     }
-    expect(everyCard.sort()).toEqual(contributionDeck().sort());
+    expect(everyCard.sort()).toEqual(contributionDeck(next.players.length).sort());
   });
 });

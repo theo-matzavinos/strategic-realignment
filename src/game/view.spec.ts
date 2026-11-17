@@ -1,8 +1,9 @@
 import { cardTypes } from './cards';
 import type { DemandType } from './demands';
-import type { Game } from './game';
+import type { Game, PlayerId } from './game';
 import { replay } from './replay';
 import { inContribute, inEnded, inRetro } from './testing/narrow';
+import { randomGame } from './testing/random-play';
 import { roomFor } from './testing/room';
 import {
   act,
@@ -31,7 +32,7 @@ describe('viewFor', () => {
       board: { progress: 0, target: 13, morale: 4, debt: 0, auditsLeft: 2 },
       demand: null,
       pastDemands: [],
-      me: { playerId: 'p2', role: null, hand: [], contribution: null },
+      me: { playerId: 'p2', role: null, hand: [], contribution: null, otherPlant: null },
       players: [
         {
           playerId: 'p1',
@@ -79,6 +80,7 @@ describe('viewFor', () => {
       role: game.roles['p3'],
       hand: game.hands['p3'],
       contribution: null,
+      otherPlant: null,
     });
   });
 
@@ -89,20 +91,38 @@ describe('viewFor', () => {
     [6, 4],
     [7, 5],
     [7, 6],
+    [8, 7],
+    [9, 8],
+    [10, 9],
   ]) {
     it(`hides everything else from every player (${playerCount} players, seed ${seed})`, () => {
       const game = started(playerCount, seed);
       const viewedRoom = room(game);
       const hidden = game.demands.slice(1);
 
+      const plants: PlayerId[] = [];
+      for (const playerId of game.players) {
+        if (game.roles[playerId] === 'plant') {
+          plants.push(playerId);
+        }
+      }
+
       for (const playerId of game.players) {
         const view = viewFor(viewedRoom, playerId);
 
+        let otherPlant: PlayerId | null = null;
+        if (plants.length === 2 && playerId === plants[0]) {
+          otherPlant = plants[1];
+        }
+        if (plants.length === 2 && playerId === plants[1]) {
+          otherPlant = plants[0];
+        }
         expect(view.me).toEqual({
           playerId,
           role: game.roles[playerId],
           hand: game.hands[playerId],
           contribution: null,
+          otherPlant,
         });
 
         for (const player of view.players) {
@@ -352,6 +372,52 @@ describe('viewFor after the end', () => {
       expect(view.retroReady).toEqual([]);
       for (const player of view.players) {
         expect(player.isAudited).toBe(false);
+      }
+    }
+  });
+});
+
+describe('the other Plant', () => {
+  it("names each Plant to the other at 8 players, in every phase, and nobody else's view", () => {
+    // Seed 1's random 8-player game deals the Plant cards to p2 and p7.
+    const final = inEnded(randomGame(1, 8));
+    expect(final.roles['p2']).toBe('plant');
+    expect(final.roles['p7']).toBe('plant');
+
+    let game: Game = lobby(8, 1);
+    for (const playerId of game.players) {
+      expect(viewFor(room(game), playerId).me.otherPlant).toBeNull();
+    }
+
+    const phasesSeen = new Set<string>();
+    for (const { playerId: actor, action } of final.log) {
+      game = act(game, actor, action);
+      phasesSeen.add(game.phase);
+
+      for (const playerId of game.players) {
+        const { otherPlant } = viewFor(room(game), playerId).me;
+        if (playerId === 'p2') {
+          expect(otherPlant).toBe('p7');
+        } else if (playerId === 'p7') {
+          expect(otherPlant).toBe('p2');
+        } else {
+          expect(otherPlant).toBeNull();
+        }
+      }
+    }
+    expect([...phasesSeen].sort()).toEqual(['contribute', 'ended', 'retro']);
+
+    const ended = viewFor(room(game), 'p1');
+    expect(ended.result?.winner).toBe(final.winner);
+    expect(ended.result?.roles['p2']).toBe('plant');
+    expect(ended.result?.roles['p7']).toBe('plant');
+  });
+
+  it('is null for the one Plant at 5–7 players', () => {
+    for (const playerCount of [5, 6, 7]) {
+      const game = started(playerCount, 1);
+      for (const playerId of game.players) {
+        expect(viewFor(room(game), playerId).me.otherPlant).toBeNull();
       }
     }
   });

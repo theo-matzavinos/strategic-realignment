@@ -37,7 +37,7 @@ import { SeatAvatar } from './seat-avatar';
             code <strong class="font-semibold tracking-[0.14em] text-fg">{{ room().code }}</strong>
           </p>
           <p>
-            4 sprints · {{ minPlayers }}–{{ maxPlayers }} attendees · one of you works for
+            4 sprints · {{ minPlayers }}–{{ maxPlayers }} attendees · one or two of you work for
             management
           </p>
         </div>
